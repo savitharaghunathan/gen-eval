@@ -1,0 +1,9 @@
+[project]
+name = "gen-eval"
+version = "0.1.0"
+description = "Project GenEval: A Unified Evaluation Framework for Generative AI Applications"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.11.7",
+]
