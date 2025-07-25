@@ -63,20 +63,6 @@ class RAGASAdapter:
         # Set supported metrics based on available metrics
         self.supported_metrics = list(self.available_metrics.keys())
 
-    def set_llm_initializer(self, llm_initializer: LLMInitializer):
-        """
-        Set LLM initializer after initialization
-        
-        Args:
-            llm_initializer: LLMInitializer instance for LLM configuration
-        """
-        self.llm_initializer = llm_initializer
-        if self.llm_initializer:
-            self.llm_config = self.llm_initializer.configure_ragas_llm()
-            self.logger.info(f"LLM configured with provider: {self.llm_initializer.get_selected_provider()}")
-        else:
-            self.llm_config = {}
-            self.logger.warning("LLM initializer cleared")
 
     def _prepare_dataset(self, input: Input) -> Dataset:
         """
