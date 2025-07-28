@@ -2,6 +2,7 @@ import logging
 from typing import List, Dict, Any
 from ragas.metrics import (
     LLMContextPrecisionWithoutReference,
+    LLMContextPrecisionWithReference,
     LLMContextRecall,
     ContextEntityRecall,
     NoiseSensitivity,
@@ -42,16 +43,18 @@ class RAGASAdapter:
 
         # Initialize metrics with LLM configuration if available
         try:
-            if self.llm_initializer and hasattr(self.llm_initializer, 'selected_provider'):
+            if self.llm_initializer and self.llm_initializer.selected_provider:
                 # Initialize with configured LLM
                 self.available_metrics = {
-                    "context_precision": LLMContextPrecisionWithoutReference(),
+                    "context_precision_without_reference": LLMContextPrecisionWithoutReference(),
+                    "context_precision_with_reference": LLMContextPrecisionWithReference(),
                     "context_recall": LLMContextRecall(),
                     "context_entity_recall": ContextEntityRecall(),
                     "noise_sensitivity": NoiseSensitivity(),
                     "response_relevancy": ResponseRelevancy(),
                     "faithfulness": Faithfulness()
                 }
+                self.logger.info(f"RAGAS metrics initialized successfully with {len(self.available_metrics)} metrics")
             else:
                 # No LLM available - initialize empty metrics
                 self.logger.warning("No LLM provided, RAGAS metrics will not be available")

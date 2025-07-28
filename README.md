@@ -9,15 +9,16 @@ GenEval solves the problem of fragmented evaluation approaches in the RAG ecosys
 Key benefits:
 - Unified API for RAGAS and DeepEval metrics
 - Consistent output format across all frameworks
-- Support for 8 unique evaluation metrics
+- Support for 9 unique evaluation metrics
 - Clean JSON output for easy integration
 
 ## Supported Metrics
 
-GenEval supports 8 unique metrics across both frameworks:
+GenEval supports 9 unique metrics across both frameworks:
 
 **RAGAS Metrics:**
-- context_precision
+- context_precision_without_reference
+- context_precision_with_reference
 - context_recall
 - context_entity_recall
 - noise_sensitivity
@@ -31,13 +32,13 @@ GenEval supports 8 unique metrics across both frameworks:
 - context_recall
 - faithfulness
 
-Note: Some metrics like `faithfulness`, `context_precision`, and `context_recall` are available in both frameworks, giving you 11 total evaluations from 8 unique concepts.
+Note: Some metrics like `faithfulness`, `context_precision`, and `context_recall` are available in both frameworks, giving you 12 total evaluations from 9 unique concepts.
 
 ## Installation
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/savitharaghunathan/gen-eval.git
 cd gen-eval
 
 # Install dependencies using uv

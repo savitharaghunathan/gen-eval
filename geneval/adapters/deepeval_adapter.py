@@ -40,7 +40,7 @@ class DeepEvalAdapter:
 
         # Initialize metrics with LLM configuration if available
         try:
-            if self.llm_initializer and hasattr(self.llm_initializer, 'selected_provider'):
+            if self.llm_initializer and self.llm_initializer.selected_provider:
               
                 self.available_metrics = {
                     "answer_relevance": AnswerRelevancyMetric(),
@@ -49,6 +49,7 @@ class DeepEvalAdapter:
                     "context_recall": ContextualRecallMetric(),
                     "context_precision": ContextualPrecisionMetric(),
                 }
+                self.logger.info(f"DeepEval metrics initialized successfully with {len(self.available_metrics)} metrics")
             else:
                 # No LLM available - initialize empty metrics
                 self.logger.warning("No LLM provided, DeepEval metrics will not be available")

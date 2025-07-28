@@ -37,7 +37,7 @@ class LLMInitializer:
         Initialize a specific LLM provider
         
         Args:
-            provider: Provider name ('openai' or 'anthropic')
+            provider: Provider name ('openai', 'anthropic', or 'auto')
         """
         provider = provider.lower()
         
@@ -45,9 +45,11 @@ class LLMInitializer:
             self._initialize_openai()
         elif provider == "anthropic":
             self._initialize_anthropic()
+        elif provider == "auto":
+            self._initialize_auto()
         else:
             self.logger.error(f"Unsupported provider: {provider}")
-            raise ValueError(f"Unsupported provider: {provider}. Supported providers: openai, anthropic")
+            raise ValueError(f"Unsupported provider: {provider}. Supported providers: openai, anthropic, auto")
 
     def _initialize_openai(self):
         """
@@ -76,6 +78,33 @@ class LLMInitializer:
         else:
             self.logger.error("ANTHROPIC_API_KEY not found in environment variables")
             raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
+
+    def _initialize_auto(self):
+        """
+        Auto-detect and initialize the best available LLM provider
+        Tries OpenAI first, then Anthropic
+        """
+        self.logger.info("Auto-detecting LLM provider...")
+        
+        # Try OpenAI first
+        try:
+            self._initialize_openai()
+            self.logger.info("Auto-detection successful: using OpenAI")
+            return
+        except Exception as e:
+            self.logger.debug(f"OpenAI initialization failed: {e}")
+        
+        # Try Anthropic if OpenAI failed
+        try:
+            self._initialize_anthropic()
+            self.logger.info("Auto-detection successful: using Anthropic")
+            return
+        except Exception as e:
+            self.logger.debug(f"Anthropic initialization failed: {e}")
+        
+        # Both failed
+        self.logger.error("Auto-detection failed: no LLM provider available")
+        raise ValueError("No LLM provider available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY")
 
     def get_openai_client(self) -> Optional[OpenAI]:
         """

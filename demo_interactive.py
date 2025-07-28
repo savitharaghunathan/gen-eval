@@ -70,7 +70,8 @@ def get_user_preferences():
     
     # Metric selection - show unique metrics
     unique_metrics = [
-        "context_precision",
+        "context_precision_without_reference",
+        "context_precision_with_reference",
         "context_recall", 
         "context_entity_recall",
         "noise_sensitivity",
@@ -80,12 +81,12 @@ def get_user_preferences():
         "context_relevance"
     ]
     
-    print(f"\nAvailable metrics (8 unique):")
+    print(f"\nAvailable metrics (9 unique):")
     for i, metric in enumerate(unique_metrics, 1):
         print(f"{i:2d}. {metric}")
     
     print(f"\nMetric selection:")
-    print("- Enter 'all' for all 8 metrics")
+    print("- Enter 'all' for all 9 metrics")
     print("- Enter numbers (comma-separated, e.g., 1,3,6)")
     
     while True:
@@ -100,7 +101,7 @@ def get_user_preferences():
                     selected_metrics = [unique_metrics[i] for i in indices]
                     break
                 else:
-                    print("Invalid metric numbers. Please use numbers 1-8.")
+                    print("Invalid metric numbers. Please use numbers 1-9.")
             except ValueError:
                 print("Please enter 'all' or numbers separated by commas (e.g., 1,3,6)")
     
@@ -222,27 +223,14 @@ def display_final_summary(all_results, metrics, num_cases):
 
 def initialize_llm(provider):
     """Initialize LLM based on provider choice"""
-    if provider == "auto":
-        # Try OpenAI first, then Anthropic
-        for prov in ["openai", "anthropic"]:
-            try:
-                print(f"Trying {prov.upper()}...")
-                llm_initializer = LLMInitializer(provider=prov)
-                print(f"{prov.upper()} initialized successfully")
-                return llm_initializer, prov
-            except Exception as e:
-                print(f"{prov.upper()} failed: {e}")
-                continue
+    try:
+        print(f"Initializing {provider.upper()}...")
+        llm_initializer = LLMInitializer(provider=provider)
+        print(f"{provider.upper()} initialized successfully")
+        return llm_initializer, provider
+    except Exception as e:
+        print(f"{provider.upper()} failed: {e}")
         return None, None
-    else:
-        try:
-            print(f"Initializing {provider.upper()}...")
-            llm_initializer = LLMInitializer(provider=provider)
-            print(f"{provider.upper()} initialized successfully")
-            return llm_initializer, provider
-        except Exception as e:
-            print(f"{provider.upper()} failed: {e}")
-            return None, None
 
 def main():
     """Main demo function"""
