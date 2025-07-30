@@ -7,7 +7,17 @@ Allows control over number of test cases and shows detailed evaluation output
 import sys
 import yaml
 import json
+import logging
 from pathlib import Path
+
+# # Configure logging to show INFO level messages
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#     handlers=[
+#         logging.StreamHandler(sys.stdout)
+#     ]
+# )
 
 # Add the project root to Python path
 project_root = Path(__file__).parent
