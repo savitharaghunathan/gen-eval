@@ -137,21 +137,33 @@ GenEval returns consistent JSON output:
     "metrics": [
       {
         "name": "faithfulness",
-        "score": 0.85,
-        "details": "High faithfulness score"
+        "score": 1.0,
+        "details": "RAGAS faithfulness evaluation"
       }
-    ]
+    ],
+    "metadata": {
+      "framework": "ragas",
+      "total_metrics": 1,
+      "evaluation_successful": true
+    }
   },
   "deepeval.faithfulness": {
-    "adapter": "deepeval", 
+    "adapter": "deepeval",
     "metrics": [
       {
         "name": "faithfulness",
-        "score": 0.92,
-        "details": "Answer is factually consistent"
+        "score": 1.0,
+        "details": "Great job! There are no contradictions, so the actual output is fully faithful to the retrieval context."
       }
-    ]
+    ],
+    "metadata": {
+      "framework": "deepeval",
+      "total_metrics": 1,
+      "evaluation_successful": true,
+      "test_case_count": 1
+    }
   }
 }
+
 ```
 
