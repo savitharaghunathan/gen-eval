@@ -65,9 +65,25 @@ results = framework.evaluate(
     retrieval_context="France is a country in Europe. Its capital city is Paris.",
     metrics=["faithfulness", "answer_relevance", "context_precision"]
 )
-
 # Results contain evaluations from both RAGAS and DeepEval
 print(results)
+
+### Logging Configuration
+
+To see detailed logging output during evaluation, configure logging before importing the package:
+
+```python
+import logging
+
+# Configure logging to show INFO level messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Now import and use the package
+from geneval import GenEvalFramework, LLMInitializer
+# All INFO, WARNING, and ERROR logs will now be visible
 ```
 
 ## Interactive Demo
