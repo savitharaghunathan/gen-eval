@@ -73,14 +73,8 @@ class RAGASAdapter:
         """
         self.logger.info(f"Preparing dataset for input: {input}")
         
-        # Handle retrieval_context - ensure it's a list of strings
-        if isinstance(input.retrieval_context, str):
-            # Split multiline context into separate context pieces
-            contexts = [ctx.strip() for ctx in input.retrieval_context.split('\n\n') if ctx.strip()]
-        elif isinstance(input.retrieval_context, list):
-            contexts = input.retrieval_context
-        else:
-            contexts = [str(input.retrieval_context)]
+        # Treat context as a simple string
+        contexts = [input.retrieval_context]
         
         data = {
             "question": [input.question],
@@ -89,7 +83,7 @@ class RAGASAdapter:
             "ground_truths": [[input.reference]],
             "reference": [input.reference]
         }
-        self.logger.info(f"Dataset prepared with {len(contexts)} context pieces")
+        self.logger.info(f"Dataset prepared with context")
         return Dataset.from_dict(data)
 
     def _get_metrics(self, metric_names: List[str]) -> List:

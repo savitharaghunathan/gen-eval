@@ -66,14 +66,8 @@ class DeepEvalAdapter:
         """
         Convert input to DeepEval LLMTestCase format
         """
-        # Handle retrieval_context - DeepEval expects a list of strings
-        if isinstance(input.retrieval_context, str):
-            # Split multiline context into separate context pieces
-            context = [ctx.strip() for ctx in input.retrieval_context.split('\n\n') if ctx.strip()]
-        elif isinstance(input.retrieval_context, list):
-            context = input.retrieval_context
-        else:
-            context = [str(input.retrieval_context)]
+        # Treat context as a simple string
+        context = [input.retrieval_context]
         
         return LLMTestCase(
             input=input.question,
