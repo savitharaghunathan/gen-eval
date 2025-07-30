@@ -6,6 +6,7 @@ across different frameworks like RAGAS and DeepEval.
 """
 
 import logging
+from typing import Dict
 from geneval.adapters.ragas_adapter import RAGASAdapter
 from geneval.adapters.deepeval_adapter import DeepEvalAdapter
 from geneval.llm import LLMInitializer
@@ -35,7 +36,7 @@ class GenEvalFramework:
         
         self.logger.info("GenEvalFramework initialized with adapters: %s", list(self.adapters.keys()))
 
-    def evaluate(self, **kwargs) -> Output:
+    def evaluate(self, **kwargs) -> Dict:
         """
         Evaluate the model's response using the appropriate adapter
         
