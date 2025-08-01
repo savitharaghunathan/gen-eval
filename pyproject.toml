@@ -1,0 +1,17 @@
+[project]
+name = "gen-eval"
+version = "0.1.0"
+description = "Project GenEval: A Unified Evaluation Framework for Generative AI Applications"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "datasets>=4.0.0",
+    "deepeval>=3.3.2",
+    "pandas>=2.3.1",
+    "pydantic>=2.11.7",
+    "ragas>=0.3.0",
+    "openai>=1.0.0",
+    "anthropic>=0.7.0",
+    "pyyaml>=6.0",
+    "pillow>=10.0.0", 
+]
