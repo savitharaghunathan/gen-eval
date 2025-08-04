@@ -140,7 +140,84 @@ llm_init = LLMInitializer(provider="auto")
 
 ## Testing
 
-todo
+### Running Tests
+
+```bash
+# Run all tests (unit + integration)
+python run_tests.py
+
+# Run only unit tests (fast, no external dependencies)
+python run_tests.py --unit
+
+# Run only integration tests (requires API keys)
+python run_tests.py --integration
+
+# Run tests with coverage report
+python run_tests.py --coverage
+
+# Run tests with verbose output
+python run_tests.py --verbose
+```
+
+### Test Coverage
+
+- **Unit Tests (40 tests)**: Fast, isolated tests with mocked dependencies
+  - Schema validation tests
+  - LLM initialization tests
+  - Adapter functionality tests
+  - Framework integration tests
+  - Error handling tests
+  - **Coverage: 95%**
+
+- **Integration Tests (8 tests)**: End-to-end tests with real external dependencies
+  - Complete evaluation workflows
+  - Real API calls (when keys available)
+  - Performance and reliability tests
+  - Real-world usage scenarios
+
+### Test Structure
+
+```
+tests/
+├── test_framework.py      # Unit tests (40 tests)
+├── test_integration.py    # Integration tests (8 tests)
+├── test_data.yaml         # Test dataset (not included in repo)
+```
+
+### Test Data Format
+
+To create your own test data, use this YAML format:
+
+```yaml
+test_cases:
+  - id: "test_001"
+    user_input: "What is the capital of France?"
+    retrieved_contexts: "France is a country in Europe. Its capital city is Paris."
+    response: "Paris is the capital of France."
+    reference: "Paris"
+
+  - id: "test_002"
+    user_input: "What is 2+2?"
+    retrieved_contexts: "Basic arithmetic: 2+2 equals 4."
+    response: "2+2 equals 4."
+    reference: "4"
+```
+
+### Running Integration Tests
+
+Integration tests require API keys to run:
+
+```bash
+# Set your API key
+export OPENAI_API_KEY="your-openai-api-key"
+# or
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+
+# Run integration tests
+python run_tests.py --integration
+```
+
+
 
 ## Output Format
 
