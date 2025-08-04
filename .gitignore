@@ -207,3 +207,9 @@ config.ini
 secrets.json
 .env.local
 .env.production 
+
+# local test files
+tests/test_data.yaml
+tests/test_data_clean.yaml
+
+.deepeval/

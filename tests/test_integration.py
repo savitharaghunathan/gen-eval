@@ -10,7 +10,7 @@ import os
 import yaml
 from pathlib import Path
 
-from geneval import GenEvalFramework, LLMInitializer
+from geneval import GenEvalFramework, LLMManager
 from geneval.schemas import Input
 
 
@@ -31,28 +31,24 @@ def test_data():
 
 
 @pytest.fixture
-def llm_initializer():
-    """Initialize LLM with available provider"""
-    # Try to initialize with available API keys
-    providers = ['openai', 'anthropic']
-    
-    for provider in providers:
-        try:
-            llm = LLMInitializer(provider=provider)
-            if llm.selected_provider:
-                return llm
-        except Exception:
-            continue
-    
-    pytest.skip("No LLM provider available (set OPENAI_API_KEY or ANTHROPIC_API_KEY)")
+def llm_manager():
+    """Initialize LLM manager with config file"""
+    try:
+        llm_manager = LLMManager()
+        if llm_manager.select_provider():
+            return llm_manager
+        else:
+            pytest.skip("No default LLM provider configured in config file")
+    except Exception as e:
+        pytest.skip(f"LLM manager initialization failed: {e}")
 
 
 class TestEndToEndEvaluation:
     """Test complete evaluation workflows"""
     
-    def test_single_metric_evaluation(self, llm_initializer, test_data):
+    def test_single_metric_evaluation(self, llm_manager, test_data):
         """Test evaluation with a single metric"""
-        framework = GenEvalFramework(llm_initializer=llm_initializer)
+        framework = GenEvalFramework(llm_manager=llm_manager)
         
         test_case = test_data['test_cases'][0]
         
@@ -78,9 +74,9 @@ class TestEndToEndEvaluation:
             assert hasattr(output, 'metadata')
             assert output.metadata['framework'] == adapter_name
     
-    def test_multiple_metrics_evaluation(self, llm_initializer, test_data):
+    def test_multiple_metrics_evaluation(self, llm_manager, test_data):
         """Test evaluation with multiple metrics"""
-        framework = GenEvalFramework(llm_initializer=llm_initializer)
+        framework = GenEvalFramework(llm_manager=llm_manager)
         
         test_case = test_data['test_cases'][0]
         
@@ -102,9 +98,9 @@ class TestEndToEndEvaluation:
         
         assert len(adapters_used) >= 1
     
-    def test_ragas_specific_evaluation(self, llm_initializer, test_data):
+    def test_ragas_specific_evaluation(self, llm_manager, test_data):
         """Test RAGAS-specific metrics"""
-        framework = GenEvalFramework(llm_initializer=llm_initializer)
+        framework = GenEvalFramework(llm_manager=llm_manager)
         
         test_case = test_data['test_cases'][0]
         
@@ -125,9 +121,9 @@ class TestEndToEndEvaluation:
                 assert adapter_name == 'ragas'
                 assert output.metadata['framework'] == 'ragas'
     
-    def test_deepeval_specific_evaluation(self, llm_initializer, test_data):
+    def test_deepeval_specific_evaluation(self, llm_manager, test_data):
         """Test DeepEval-specific metrics"""
-        framework = GenEvalFramework(llm_initializer=llm_initializer)
+        framework = GenEvalFramework(llm_manager=llm_manager)
         
         test_case = test_data['test_cases'][0]
         
@@ -152,9 +148,9 @@ class TestEndToEndEvaluation:
 class TestRealWorldScenarios:
     """Test real-world usage scenarios"""
     
-    def test_multiple_test_cases(self, llm_initializer, test_data):
+    def test_multiple_test_cases(self, llm_manager, test_data):
         """Test evaluation across multiple test cases"""
-        framework = GenEvalFramework(llm_initializer=llm_initializer)
+        framework = GenEvalFramework(llm_manager=llm_manager)
         
         # Test first 3 cases
         for i in range(min(3, len(test_data['test_cases']))):
@@ -176,9 +172,9 @@ class TestRealWorldScenarios:
                 for metric_result in output.metrics:
                     assert 0 <= metric_result.score <= 1
     
-    def test_error_handling_real_apis(self, llm_initializer):
+    def test_error_handling_real_apis(self, llm_manager):
         """Test error handling with real APIs"""
-        framework = GenEvalFramework(llm_initializer=llm_initializer)
+        framework = GenEvalFramework(llm_manager=llm_manager)
         
         # Test with invalid data that should cause errors
         try:
@@ -201,9 +197,9 @@ class TestRealWorldScenarios:
 class TestPerformanceAndReliability:
     """Test performance and reliability aspects"""
     
-    def test_evaluation_consistency(self, llm_initializer, test_data):
+    def test_evaluation_consistency(self, llm_manager, test_data):
         """Test that evaluations are consistent"""
-        framework = GenEvalFramework(llm_initializer=llm_initializer)
+        framework = GenEvalFramework(llm_manager=llm_manager)
         
         test_case = test_data['test_cases'][0]
         
@@ -230,9 +226,9 @@ class TestPerformanceAndReliability:
         # Same metrics should be present
         assert set(results1.keys()) == set(results2.keys())
     
-    def test_large_context_handling(self, llm_initializer):
+    def test_large_context_handling(self, llm_manager):
         """Test handling of large context"""
-        framework = GenEvalFramework(llm_initializer=llm_initializer)
+        framework = GenEvalFramework(llm_manager=llm_manager)
         
         # Create large context
         large_context = "This is a test context. " * 1000  # ~25KB

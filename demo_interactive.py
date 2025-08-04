@@ -23,7 +23,7 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from geneval import GenEvalFramework, LLMInitializer
+from geneval import GenEvalFramework, LLMManager
 
 def load_test_data():
     """Load test data from YAML file"""
@@ -41,27 +41,23 @@ def get_user_preferences():
     print("GenEval Framework Interactive Demo")
     print("=" * 50)
     
-    # LLM Provider selection
-    print(f"\nLLM Provider:")
-    print("1. OpenAI (requires OPENAI_API_KEY)")
-    print("2. Anthropic (requires ANTHROPIC_API_KEY)")
-    print("3. Auto-detect (try both)")
+    # Check if config file exists
+    config_path = project_root / "config" / "llm_config.yaml"
+    if not config_path.exists():
+        print(f"\n LLM configuration file not found: {config_path}")
+        print("Please create a config file with your LLM provider settings.")
+        print("Example config:")
+        print("  providers:")
+        print("    openai:")
+        print("      enabled: true")
+        print("      default: true")
+        print("      api_key_env: \"OPENAI_API_KEY\"")
+        print("      model: \"gpt-4o-mini\"")
+        print("\nExiting demo - please configure your LLM settings first.")
+        return None, None, None
     
-    while True:
-        provider_choice = input("\nChoose LLM provider (1-3, default: 3): ").strip()
-        if not provider_choice:
-            provider_choice = "3"
-        if provider_choice in ["1", "2", "3"]:
-            break
-        print("Please enter 1, 2, or 3")
-    
-    # Map choice to provider name
-    provider_map = {
-        "1": "openai",
-        "2": "anthropic", 
-        "3": "auto"
-    }
-    llm_provider = provider_map[provider_choice]
+    print(f"\n✅ Using LLM configuration from: {config_path}")
+    print("The framework will use the default provider from your config file.")
     
     # Number of test cases
     while True:
@@ -115,7 +111,7 @@ def get_user_preferences():
             except ValueError:
                 print("Please enter 'all' or numbers separated by commas (e.g., 1,3,6)")
     
-    return int(num_cases), selected_metrics, llm_provider
+    return int(num_cases), selected_metrics, "config"
 
 def convert_to_framework_metrics(selected_metrics, test_data):
     """Convert unique metrics to framework-specific format"""
@@ -231,15 +227,20 @@ def display_final_summary(all_results, metrics, num_cases):
         else:
             print("  No results available")
 
-def initialize_llm(provider):
-    """Initialize LLM based on provider choice"""
+def initialize_llm():
+    """Initialize LLM using config file"""
     try:
-        print(f"Initializing {provider.upper()}...")
-        llm_initializer = LLMInitializer(provider=provider)
-        print(f"{provider.upper()} initialized successfully")
-        return llm_initializer, provider
+        print("Initializing LLM from config file...")
+        llm_manager = LLMManager()
+        if llm_manager.select_provider():
+            provider_info = llm_manager.get_llm_info()
+            print(f"✅ LLM initialized successfully: {provider_info['provider']} ({provider_info['model']})")
+            return llm_manager, provider_info['provider']
+        else:
+            print("❌ No default LLM provider configured in config file")
+            return None, None
     except Exception as e:
-        print(f"{provider.upper()} failed: {e}")
+        print(f"❌ LLM initialization failed: {e}")
         return None, None
 
 def main():
@@ -250,32 +251,35 @@ def main():
         return
     
     # Get user preferences
-    num_cases, selected_metrics, llm_provider = get_user_preferences()
+    preferences = get_user_preferences()
+    if preferences[0] is None:
+        return
+    num_cases, selected_metrics, llm_provider = preferences
     
     # Convert unique metrics to framework-specific format
     metrics = convert_to_framework_metrics(selected_metrics, test_data)
     
     print(f"\nConfiguration:")
-    print(f"   LLM Provider: {llm_provider}")
+    print(f"   LLM Provider: Config-driven")
     print(f"   Test cases: {num_cases}")
     print(f"   Selected metrics: {len(selected_metrics)} unique ({', '.join(selected_metrics)})")
     print(f"   Framework evaluations: {len(metrics)} total ({', '.join(metrics)})")
     
     # Initialize LLM
     print(f"\nInitializing LLM...")
-    llm_initializer, actual_provider = initialize_llm(llm_provider)
+    llm_manager, actual_provider = initialize_llm()
     
-    if not llm_initializer:
-        print("No LLM provider available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY")
-        print("GenEval requires an LLM to perform evaluations")
-        print("Exiting demo - please configure your API keys and try again")
+    if not llm_manager:
+        print("❌ LLM initialization failed.")
+        print("Please check your config file and API keys.")
+        print("Exiting demo - please configure your LLM settings and try again")
         return
     else:
-        print(f"Using {actual_provider.upper()} as LLM provider")
+        print(f"✅ Using {actual_provider.upper()} as LLM provider")
     
     # Initialize framework with LLM
     print(f"\nInitializing GenEval Framework...")
-    framework = GenEvalFramework(llm_initializer=llm_initializer)
+    framework = GenEvalFramework(llm_manager=llm_manager)
     
     # Run evaluations
     all_results = []

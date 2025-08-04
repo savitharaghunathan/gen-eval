@@ -12,7 +12,7 @@ from ragas.metrics import (
 from ragas import evaluate
 from datasets import Dataset
 from geneval.schemas import Input, MetricResult, Output
-from geneval.llm import LLMInitializer
+from geneval.llm_manager import LLMManager
 
 
 
@@ -22,46 +22,44 @@ class RAGASAdapter:
     """
  
 
-    def __init__(self, llm_initializer: LLMInitializer = None):
+    def __init__(self, llm_manager: LLMManager):
         """
         Initialize the RAGASAdapter
         
         Args:
-            llm_initializer: Optional LLMInitializer instance for LLM configuration
+            llm_manager: LLMManager instance for LLM configuration (required)
         """
         self.logger = logging.getLogger(__name__)
         self.logger.info("Initializing RAGASAdapter")
 
-        # Initialize LLM if provided
-        self.llm_initializer = llm_initializer
-        if self.llm_initializer:
-            self.llm_config = self.llm_initializer.configure_ragas_llm()
-            self.logger.info(f"LLM configured with provider: {self.llm_initializer.get_selected_provider()}")
-        else:
-            self.llm_config = {}
-            self.logger.warning("No LLM initializer provided")
+        if not llm_manager:
+            raise ValueError("LLMManager is required for RAGASAdapter initialization")
 
-        # Initialize metrics with LLM configuration if available
+        # Initialize LLM
+        self.llm_manager = llm_manager
+        self.llm_config = self.llm_manager.configure_for_ragas()
+        self.llm_info = self.llm_manager.get_llm_info()
+        
+        if not self.llm_manager.get_llm():
+            raise ValueError("No LLM available. Please configure an LLM provider.")
+        
+        self.logger.info(f"LLM configured with provider: {self.llm_info.get('provider', 'unknown')}")
+
+        # Initialize metrics with LLM configuration
         try:
-            if self.llm_initializer and self.llm_initializer.selected_provider:
-                # Initialize with configured LLM
-                self.available_metrics = {
-                    "context_precision_without_reference": LLMContextPrecisionWithoutReference(),
-                    "context_precision_with_reference": LLMContextPrecisionWithReference(),
-                    "context_recall": LLMContextRecall(),
-                    "context_entity_recall": ContextEntityRecall(),
-                    "noise_sensitivity": NoiseSensitivity(),
-                    "response_relevancy": ResponseRelevancy(),
-                    "faithfulness": Faithfulness()
-                }
-                self.logger.info(f"RAGAS metrics initialized successfully with {len(self.available_metrics)} metrics")
-            else:
-                # No LLM available - initialize empty metrics
-                self.logger.warning("No LLM provided, RAGAS metrics will not be available")
-                self.available_metrics = {}
+            self.available_metrics = {
+                "context_precision_without_reference": LLMContextPrecisionWithoutReference(),
+                "context_precision_with_reference": LLMContextPrecisionWithReference(),
+                "context_recall": LLMContextRecall(),
+                "context_entity_recall": ContextEntityRecall(),
+                "noise_sensitivity": NoiseSensitivity(),
+                "response_relevancy": ResponseRelevancy(),
+                "faithfulness": Faithfulness()
+            }
+            self.logger.info(f"RAGAS metrics initialized successfully with {len(self.available_metrics)} metrics")
         except Exception as e:
             self.logger.error(f"Failed to initialize RAGAS metrics: {e}")
-            self.available_metrics = {}
+            raise RuntimeError(f"Failed to initialize RAGAS metrics: {e}")
         
         # Set supported metrics based on available metrics
         self.supported_metrics = list(self.available_metrics.keys())
@@ -151,13 +149,20 @@ class RAGASAdapter:
             else:
                 self.logger.error(f"RAGAS results format unexpected: {type(results)}")
             
-            # Prepare metadata
+            # Prepare metadata with LLM information
             self.logger.info(f"Preparing metadata")
             metadata = {
                 "framework": "ragas",
                 "total_metrics": len(metric_results),
                 "evaluation_successful": True
             }
+            
+            # Add LLM information if available
+            if self.llm_info:
+                metadata.update({
+                    "llm_provider": self.llm_info.get("provider"),
+                    "llm_model": self.llm_info.get("model")
+                })
             
             self.logger.info(f"Returning output")
             return Output(
@@ -173,6 +178,13 @@ class RAGASAdapter:
                 "error": str(e),
                 "evaluation_successful": False
             }
+            
+            # Add LLM information if available
+            if self.llm_info:
+                metadata.update({
+                    "llm_provider": self.llm_info.get("provider"),
+                    "llm_model": self.llm_info.get("model")
+                })
 
             self.logger.info(f"Returning error output: {metadata}")
             return Output(

@@ -9,7 +9,7 @@ import logging
 from typing import Dict
 from geneval.adapters.ragas_adapter import RAGASAdapter
 from geneval.adapters.deepeval_adapter import DeepEvalAdapter
-from geneval.llm import LLMInitializer
+from geneval.llm_manager import LLMManager
 from geneval.schemas import Input, Output
 
 
@@ -18,23 +18,38 @@ class GenEvalFramework:
     Main framework for evaluating LLMs using multiple evaluation frameworks
     """
     
-    def __init__(self, llm_initializer: LLMInitializer = None):
+    def __init__(self, llm_manager: LLMManager = None):
         """
         Initialize the GenEval framework
         
         Args:
-            llm_initializer: Optional LLMInitializer instance for LLM configuration
+            llm_manager: Optional LLMManager instance for LLM configuration
         """
         self.logger = logging.getLogger(__name__)
         self.logger.info("Initializing GenEvalFramework")
         
-        # Initialize adapters
-        self.adapters = {
-            "ragas": RAGASAdapter(llm_initializer),
-            "deepeval": DeepEvalAdapter(llm_initializer)
-        }
+        # Initialize LLM manager if not provided
+        if llm_manager is None:
+            llm_manager = LLMManager()
+            # Select default provider from config
+            if not llm_manager.select_provider():
+                raise ValueError("No default LLM provider configured. Please set 'default: true' for one provider in the config.")
         
-        self.logger.info("GenEvalFramework initialized with adapters: %s", list(self.adapters.keys()))
+        self.llm_manager = llm_manager
+        self.llm_info = llm_manager.get_llm_info()
+        
+        # Initialize adapters with LLM manager (required)
+        try:
+            self.adapters = {
+                "ragas": RAGASAdapter(llm_manager),
+                "deepeval": DeepEvalAdapter(llm_manager)
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize adapters: {e}")
+        
+        self.logger.info(f"GenEvalFramework initialized with adapters: {list(self.adapters.keys())}")
+        if self.llm_info:
+            self.logger.info(f"Using LLM: {self.llm_info['provider']} - {self.llm_info['model']}")
 
     def evaluate(self, **kwargs) -> Dict:
         """
