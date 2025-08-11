@@ -23,7 +23,7 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from geneval import GenEvalFramework, LLMManager
+from geneval import GenEvalFramework
 
 def load_test_data():
     """Load test data from YAML file"""
@@ -54,9 +54,9 @@ def get_user_preferences():
         print("      api_key_env: \"OPENAI_API_KEY\"")
         print("      model: \"gpt-4o-mini\"")
         print("\nExiting demo - please configure your LLM settings first.")
-        return None, None, None
+        return None, None
     
-    print(f"\n✅ Using LLM configuration from: {config_path}")
+    print(f"\nUsing LLM configuration from: {config_path}")
     print("The framework will use the default provider from your config file.")
     
     # Number of test cases
@@ -111,7 +111,7 @@ def get_user_preferences():
             except ValueError:
                 print("Please enter 'all' or numbers separated by commas (e.g., 1,3,6)")
     
-    return int(num_cases), selected_metrics, "config"
+    return int(num_cases), selected_metrics
 
 def convert_to_framework_metrics(selected_metrics, test_data):
     """Convert unique metrics to framework-specific format"""
@@ -227,22 +227,6 @@ def display_final_summary(all_results, metrics, num_cases):
         else:
             print("  No results available")
 
-def initialize_llm():
-    """Initialize LLM using config file"""
-    try:
-        print("Initializing LLM from config file...")
-        llm_manager = LLMManager()
-        if llm_manager.select_provider():
-            provider_info = llm_manager.get_llm_info()
-            print(f"✅ LLM initialized successfully: {provider_info['provider']} ({provider_info['model']})")
-            return llm_manager, provider_info['provider']
-        else:
-            print("❌ No default LLM provider configured in config file")
-            return None, None
-    except Exception as e:
-        print(f"❌ LLM initialization failed: {e}")
-        return None, None
-
 def main():
     """Main demo function"""
     # Load test data
@@ -254,7 +238,7 @@ def main():
     preferences = get_user_preferences()
     if preferences[0] is None:
         return
-    num_cases, selected_metrics, llm_provider = preferences
+    num_cases, selected_metrics = preferences
     
     # Convert unique metrics to framework-specific format
     metrics = convert_to_framework_metrics(selected_metrics, test_data)
@@ -265,21 +249,17 @@ def main():
     print(f"   Selected metrics: {len(selected_metrics)} unique ({', '.join(selected_metrics)})")
     print(f"   Framework evaluations: {len(metrics)} total ({', '.join(metrics)})")
     
-    # Initialize LLM
-    print(f"\nInitializing LLM...")
-    llm_manager, actual_provider = initialize_llm()
-    
-    if not llm_manager:
-        print("❌ LLM initialization failed.")
+    # Initialize framework with config path
+    print(f"\nInitializing GenEval Framework...")
+    try:
+        config_path = str(project_root / "config" / "llm_config.yaml")
+        framework = GenEvalFramework(config_path=config_path)
+        print("Framework initialized successfully")
+    except Exception as e:
+        print(f"Framework initialization failed: {e}")
         print("Please check your config file and API keys.")
         print("Exiting demo - please configure your LLM settings and try again")
         return
-    else:
-        print(f"✅ Using {actual_provider.upper()} as LLM provider")
-    
-    # Initialize framework with LLM
-    print(f"\nInitializing GenEval Framework...")
-    framework = GenEvalFramework(llm_manager=llm_manager)
     
     # Run evaluations
     all_results = []

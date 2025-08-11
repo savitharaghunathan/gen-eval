@@ -18,31 +18,30 @@ class GenEvalFramework:
     Main framework for evaluating LLMs using multiple evaluation frameworks
     """
     
-    def __init__(self, llm_manager: LLMManager = None):
+    def __init__(self, config_path: str):
         """
         Initialize the GenEval framework
         
         Args:
-            llm_manager: Optional LLMManager instance for LLM configuration
+            config_path: Path to LLM configuration file (required)
         """
         self.logger = logging.getLogger(__name__)
         self.logger.info("Initializing GenEvalFramework")
         
-        # Initialize LLM manager if not provided
-        if llm_manager is None:
-            llm_manager = LLMManager()
-            # Select default provider from config
-            if not llm_manager.select_provider():
-                raise ValueError("No default LLM provider configured. Please set 'default: true' for one provider in the config.")
+        # Initialize LLM manager with the provided config path
+        self.llm_manager = LLMManager(config_path=config_path)
         
-        self.llm_manager = llm_manager
-        self.llm_info = llm_manager.get_llm_info()
+        # Select default provider from config
+        if not self.llm_manager.select_provider():
+            raise ValueError("No default LLM provider configured. Please set 'default: true' for one provider in the config.")
+        
+        self.llm_info = self.llm_manager.get_llm_info()
         
         # Initialize adapters with LLM manager (required)
         try:
             self.adapters = {
-                "ragas": RAGASAdapter(llm_manager),
-                "deepeval": DeepEvalAdapter(llm_manager)
+                "ragas": RAGASAdapter(self.llm_manager),
+                "deepeval": DeepEvalAdapter(self.llm_manager)
             }
         except Exception as e:
             raise RuntimeError(f"Failed to initialize adapters: {e}")

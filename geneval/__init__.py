@@ -10,12 +10,10 @@ __author__ = "Savitha Raghunathan"
 
 from .framework import GenEvalFramework
 from .schemas import Input, Output, MetricResult
-from .llm_manager import LLMManager
 
 __all__ = [
     "GenEvalFramework",
     "Input", 
     "Output",
     "MetricResult",
-    "LLMManager",
 ] 

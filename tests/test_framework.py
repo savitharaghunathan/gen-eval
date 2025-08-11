@@ -120,7 +120,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         assert manager.config == mock_config
     
     @patch('geneval.llm_manager.LLMManager._load_config')
@@ -129,7 +129,7 @@ class TestLLMManager:
         mock_load_config.side_effect = FileNotFoundError("Config file not found")
         
         with pytest.raises(FileNotFoundError):
-            LLMManager()
+            LLMManager(config_path="test_config.yaml")
     
     @patch('geneval.llm_manager.LLMManager._load_config')
     def test_invalid_config_file(self, mock_load_config):
@@ -137,7 +137,7 @@ class TestLLMManager:
         mock_load_config.side_effect = RuntimeError("Invalid YAML")
         
         with pytest.raises(RuntimeError):
-            LLMManager()
+            LLMManager(config_path="test_config.yaml")
     
     @patch('geneval.llm_manager.LLMManager._load_config')
     @patch('geneval.llm_manager.LLMManager._get_or_create_provider')
@@ -155,7 +155,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         mock_get_or_create.return_value = Mock()
         
         result = manager.select_provider()
@@ -177,7 +177,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         
         result = manager.select_provider()
         assert result is False
@@ -197,7 +197,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.selected_provider = "openai"
         manager.selected_model = "gpt-4o-mini"
         
@@ -211,7 +211,7 @@ class TestLLMManager:
         mock_config = {"providers": {}}
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.selected_provider = None
         
         llm_info = manager.get_llm_info()
@@ -234,7 +234,7 @@ class TestLLMManager:
         mock_load_config.return_value = mock_config
         
         mock_llm = Mock()
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {"openai": mock_llm}
         manager.selected_provider = "openai"
         mock_get_or_create.return_value = mock_llm
@@ -259,7 +259,7 @@ class TestLLMManager:
         mock_load_config.return_value = mock_config
         
         mock_llm = Mock()
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {"openai": mock_llm}
         manager.selected_provider = None  # No provider selected initially
         
@@ -283,7 +283,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {"openai": Mock()}
         manager.selected_provider = None
         
@@ -297,7 +297,7 @@ class TestLLMManager:
         mock_config = {"providers": {}}
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.selected_provider = "openai"
         
         provider_name = manager.get_provider_name()
@@ -310,7 +310,7 @@ class TestLLMManager:
         mock_config = {"providers": {}}
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.selected_model = "gpt-4o-mini"
         
         model_name = manager.get_model_name()
@@ -327,7 +327,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
 
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
 
         providers = manager.get_available_providers()
         assert set(providers) == {"openai", "anthropic"}
@@ -343,7 +343,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
 
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         mock_get_or_create.return_value = Mock()
 
         assert manager.is_provider_available("openai") is True
@@ -357,7 +357,7 @@ class TestLLMManager:
         mock_load_config.return_value = mock_config
         
         mock_llm = Mock()
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {"openai": mock_llm}
         manager.selected_provider = "openai"
         manager.selected_model = "gpt-4o-mini"
@@ -374,7 +374,7 @@ class TestLLMManager:
         mock_config = {"providers": {}}
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {}
         manager.selected_provider = None
         
@@ -389,7 +389,7 @@ class TestLLMManager:
         mock_load_config.return_value = mock_config
         
         mock_llm = Mock()
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {"openai": mock_llm}
         manager.selected_provider = "openai"
         manager.selected_model = "gpt-4o-mini"
@@ -406,7 +406,7 @@ class TestLLMManager:
         mock_config = {"providers": {}}
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {}
         manager.selected_provider = None
         
@@ -425,7 +425,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         # Should not raise an exception, just log a warning
         assert manager.config == mock_config
     
@@ -441,7 +441,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         # Should not raise an exception, just log a warning
         assert manager.config == mock_config
     
@@ -456,7 +456,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
 
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         # With lazy initialization, providers are only registered, not created
         assert "openai" in manager.provider_configs
         assert "anthropic" in manager.provider_configs
@@ -473,7 +473,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
 
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         # With lazy initialization, disabled providers are not registered
         assert len(manager.provider_configs) == 0
         assert len(manager.providers) == 0
@@ -485,7 +485,7 @@ class TestLLMManager:
         mock_config = {"providers": {}}
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         result = manager._create_llm_provider("unknown", {})
         assert result is None
     
@@ -508,7 +508,7 @@ class TestLLMManager:
         mock_llm = Mock()
         mock_openai.return_value = mock_llm
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         result = manager._create_openai_provider({"api_key_env": "OPENAI_API_KEY", "model": "gpt-4o-mini"})
         
         assert result == mock_llm
@@ -527,7 +527,7 @@ class TestLLMManager:
         mock_config = {"providers": {}, "settings": {}}
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         result = manager._create_openai_provider({"api_key_env": "OPENAI_API_KEY"})
         
         assert result is None
@@ -550,7 +550,7 @@ class TestLLMManager:
         mock_llm = Mock()
         mock_anthropic.return_value = mock_llm
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         result = manager._create_anthropic_provider({"api_key_env": "ANTHROPIC_API_KEY", "model": "claude-3-5-haiku"})
         
         assert result == mock_llm
@@ -568,7 +568,7 @@ class TestLLMManager:
         mock_config = {"providers": {}, "settings": {}}
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         result = manager._create_anthropic_provider({"api_key_env": "ANTHROPIC_API_KEY"})
         
         assert result is None
@@ -591,7 +591,7 @@ class TestLLMManager:
         mock_llm = Mock()
         mock_gemini.return_value = mock_llm
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         result = manager._create_gemini_provider({"api_key_env": "GOOGLE_API_KEY", "model": "gemini-1.5-flash"})
         
         assert result == mock_llm
@@ -609,7 +609,7 @@ class TestLLMManager:
         mock_config = {"providers": {}, "settings": {}}
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         result = manager._create_gemini_provider({"api_key_env": "GOOGLE_API_KEY"})
         
         assert result is None
@@ -630,7 +630,7 @@ class TestLLMManager:
         mock_llm = Mock()
         mock_ollama.return_value = mock_llm
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         result = manager._create_ollama_provider({"base_url": "http://localhost:11434", "model": "llama3.2"})
         
         assert result == mock_llm
@@ -656,7 +656,7 @@ class TestLLMManager:
         mock_llm = Mock()
         mock_ollama.return_value = mock_llm
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         result = manager._create_ollama_provider({"model": "llama3.2"})
         
         assert result == mock_llm
@@ -678,7 +678,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {"openai": Mock(), "anthropic": Mock()}
         
         result = manager.select_provider("anthropic")
@@ -697,7 +697,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
 
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         mock_get_or_create.return_value = None  # Provider creation fails
 
         result = manager.select_provider("anthropic")
@@ -714,7 +714,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
 
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         mock_get_or_create.return_value = None  # Provider creation fails
 
         result = manager.select_provider()
@@ -732,7 +732,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {"openai": Mock(), "anthropic": Mock()}
         
         result = manager.select_provider()
@@ -750,7 +750,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {"openai": Mock(), "anthropic": Mock()}
         
         result = manager.select_provider()
@@ -774,7 +774,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.selected_provider = "openai"
         manager.selected_model = "gpt-4o-mini"
         manager.config = mock_config
@@ -796,7 +796,7 @@ class TestLLMManager:
         mock_load_config.return_value = mock_config
         
         mock_llm = Mock()
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {"openai": mock_llm}
         manager.selected_provider = None
         
@@ -815,7 +815,7 @@ class TestLLMManager:
         }
         mock_load_config.return_value = mock_config
         
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         manager.providers = {"openai": Mock()}
         manager.selected_provider = None
         
@@ -835,7 +835,7 @@ class TestLLMManager:
         mock_load_config.return_value = mock_config
         
         # Should not raise exception, just log warning
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         assert manager.config == mock_config
     
     @patch('geneval.llm_manager.LLMManager._load_config')
@@ -851,7 +851,7 @@ class TestLLMManager:
         mock_load_config.return_value = mock_config
         
         # Should not raise exception, just log warning
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         assert manager.config == mock_config
     
     @patch('geneval.llm_manager.LLMManager._load_config')
@@ -866,7 +866,7 @@ class TestLLMManager:
         mock_load_config.return_value = mock_config
         
         # Should not raise exception, just log info
-        manager = LLMManager()
+        manager = LLMManager(config_path="test_config.yaml")
         assert manager.config == mock_config
 
 
@@ -879,7 +879,7 @@ class TestLLMManager:
             mock_yaml_load.side_effect = Exception("YAML parsing error")
             
             with pytest.raises(RuntimeError, match="Error loading LLM configuration"):
-                LLMManager()
+                LLMManager(config_path="test_config.yaml")
     
     def test_initialize_providers_exception_handling(self):
         """Test lazy provider initialization exception handling"""
@@ -903,7 +903,7 @@ class TestLLMManager:
             mock_create_provider.side_effect = create_provider_side_effect
 
             # With lazy initialization, providers are only registered, not created
-            manager = LLMManager()
+            manager = LLMManager(config_path="test_config.yaml")
             assert "openai" in manager.provider_configs
             assert "anthropic" in manager.provider_configs
             assert len(manager.providers) == 0  # No providers created yet
@@ -923,7 +923,7 @@ class TestLLMManager:
             mock_create_openai.side_effect = Exception("OpenAI creation failed")
             
             # Should not raise exception, just log error and return None
-            manager = LLMManager()
+            manager = LLMManager(config_path="test_config.yaml")
             assert len(manager.providers) == 0
     
     def test_create_openai_provider_exception_handling(self):
@@ -946,7 +946,7 @@ class TestLLMManager:
             
             with patch.dict(os.environ, {"OPENAI_API_KEY": "test_key"}):
                 # Create manager instance first
-                manager = LLMManager()
+                manager = LLMManager(config_path="test_config.yaml")
                 # Should not raise exception, just return None
                 result = manager._create_llm_provider("openai", {"api_key_env": "OPENAI_API_KEY"})
                 assert result is None
@@ -970,7 +970,7 @@ class TestLLMManager:
             
             with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test_key"}):
                 # Create manager instance first
-                manager = LLMManager()
+                manager = LLMManager(config_path="test_config.yaml")
                 # Should not raise exception, just return None
                 result = manager._create_llm_provider("anthropic", {"api_key_env": "ANTHROPIC_API_KEY"})
                 assert result is None
@@ -994,7 +994,7 @@ class TestLLMManager:
             
             with patch.dict(os.environ, {"GOOGLE_API_KEY": "test_key"}):
                 # Create manager instance first
-                manager = LLMManager()
+                manager = LLMManager(config_path="test_config.yaml")
                 # Should not raise exception, just return None
                 result = manager._create_llm_provider("gemini", {"api_key_env": "GOOGLE_API_KEY"})
                 assert result is None
@@ -1016,7 +1016,7 @@ class TestLLMManager:
             mock_ollama.side_effect = Exception("Ollama initialization failed")
             
             # Create manager instance first
-            manager = LLMManager()
+            manager = LLMManager(config_path="test_config.yaml")
             # Should not raise exception, just return None
             result = manager._create_llm_provider("ollama", {"model": "llama3.2"})
             assert result is None
@@ -1508,33 +1508,39 @@ class TestGenEvalFramework:
     
     @patch('geneval.framework.RAGASAdapter')
     @patch('geneval.framework.DeepEvalAdapter')
-    def test_initialization_with_llm(self, mock_deepeval_adapter_class, mock_ragas_adapter_class, mock_llm_manager):
-        """Test framework initialization with LLM"""
+    def test_initialization_with_config_path(self, mock_deepeval_adapter_class, mock_ragas_adapter_class):
+        """Test framework initialization with config path"""
         mock_ragas_adapter = Mock()
         mock_deepeval_adapter = Mock()
         mock_ragas_adapter_class.return_value = mock_ragas_adapter
         mock_deepeval_adapter_class.return_value = mock_deepeval_adapter
         
-        framework = GenEvalFramework(mock_llm_manager)
-        
-        assert "ragas" in framework.adapters
-        assert "deepeval" in framework.adapters
-        assert framework.adapters["ragas"] == mock_ragas_adapter
-        assert framework.adapters["deepeval"] == mock_deepeval_adapter
-        mock_ragas_adapter_class.assert_called_once_with(mock_llm_manager)
-        mock_deepeval_adapter_class.assert_called_once_with(mock_llm_manager)
+        # Mock the LLMManager to be created internally
+        with patch('geneval.framework.LLMManager') as mock_llm_manager_class:
+            mock_llm_manager = Mock()
+            mock_llm_manager.get_llm_info.return_value = {"provider": "openai", "model": "gpt-4o-mini"}
+            mock_llm_manager.select_provider.return_value = True
+            mock_llm_manager_class.return_value = mock_llm_manager
+            
+            framework = GenEvalFramework(config_path="test_config.yaml")
+            
+            assert "ragas" in framework.adapters
+            assert "deepeval" in framework.adapters
+            assert framework.adapters["ragas"] == mock_ragas_adapter
+            assert framework.adapters["deepeval"] == mock_deepeval_adapter
+            mock_ragas_adapter_class.assert_called_once_with(mock_llm_manager)
+            mock_deepeval_adapter_class.assert_called_once_with(mock_llm_manager)
     
     @patch('geneval.framework.LLMManager')
     def test_initialization_fails_no_default_provider(self, mock_llm_manager_class):
         """Test framework initialization fails when no default provider is configured"""
         mock_llm_manager = Mock()
-        mock_llm_manager.get_llm.return_value = Mock()
         mock_llm_manager.get_llm_info.return_value = {"provider": "openai", "model": "gpt-4o-mini"}
         mock_llm_manager.select_provider.return_value = False  # No default provider
         mock_llm_manager_class.return_value = mock_llm_manager
         
         with pytest.raises(ValueError, match="No default LLM provider configured"):
-            GenEvalFramework()
+            GenEvalFramework(config_path="test_config.yaml")
     
     def test_evaluate_single_metric_ragas(self, mock_framework):
         """Test evaluation with single RAGAS metric"""
@@ -1796,7 +1802,6 @@ def mock_framework():
          patch('geneval.framework.DeepEvalAdapter') as mock_deepeval_adapter_class:
         
         mock_llm_manager = Mock()
-        mock_llm_manager.get_llm.return_value = Mock()
         mock_llm_manager.get_llm_info.return_value = {"provider": "openai", "model": "gpt-4o-mini"}
         mock_llm_manager.select_provider.return_value = True
         mock_llm_manager_class.return_value = mock_llm_manager
@@ -1806,7 +1811,7 @@ def mock_framework():
         mock_ragas_adapter_class.return_value = mock_ragas_adapter
         mock_deepeval_adapter_class.return_value = mock_deepeval_adapter
         
-        framework = GenEvalFramework()
+        framework = GenEvalFramework(config_path="test_config.yaml")
         
         # Set up mock adapters with proper methods
         framework.adapters = {

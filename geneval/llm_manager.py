@@ -2,6 +2,7 @@
 LLM Manager using LangChain for GenEval framework.
 
 This module provides a unified interface for multiple LLM providers using LangChain.
+Users must specify the path to their LLM configuration file.
 """
 
 import logging
@@ -20,14 +21,17 @@ from langchain_community.llms import Ollama
 class LLMManager:
     """Manages LLM providers with lazy initialization"""
     
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str):
         """
         Initialize LLM manager
         
         Args:
-            config_path: Path to YAML configuration file (default: config/llm_config.yaml)
+            config_path: Path to YAML configuration file (required)
         """
-        self.config_path = config_path or "config/llm_config.yaml"
+        if not config_path:
+            raise ValueError("config_path is required. Please specify the path to your LLM configuration file.")
+        
+        self.config_path = config_path
         self.logger = logging.getLogger(__name__)
         
         # Load configuration
@@ -55,7 +59,7 @@ class LLMManager:
             self.logger.info(f"Loaded LLM configuration from {self.config_path}")
             return config
         except FileNotFoundError:
-            error_msg = f"LLM configuration file not found: {self.config_path}. Please create a config file with your LLM provider settings."
+            error_msg = f"LLM configuration file not found: {self.config_path}. Please check the path and ensure the file exists."
             self.logger.error(error_msg)
             raise FileNotFoundError(error_msg)
         except Exception as e:
@@ -108,8 +112,10 @@ class LLMManager:
     
     def _create_openai_provider(self, config: Dict[str, Any]) -> Optional[ChatOpenAI]:
         """Create OpenAI provider"""
+        # Only read from environment variable, never hardcode
         api_key = os.getenv(config.get("api_key_env", "OPENAI_API_KEY"))
         if not api_key:
+            self.logger.warning("OPENAI_API_KEY not found in environment variables")
             return None
         
         return ChatOpenAI(
@@ -121,8 +127,10 @@ class LLMManager:
     
     def _create_anthropic_provider(self, config: Dict[str, Any]) -> Optional[ChatAnthropic]:
         """Create Anthropic provider"""
+        # Only read from environment variable, never hardcode
         api_key = os.getenv(config.get("api_key_env", "ANTHROPIC_API_KEY"))
         if not api_key:
+            self.logger.warning("ANTHROPIC_API_KEY not found in environment variables")
             return None
         
         return ChatAnthropic(
@@ -133,8 +141,10 @@ class LLMManager:
     
     def _create_gemini_provider(self, config: Dict[str, Any]) -> Optional[ChatGoogleGenerativeAI]:
         """Create Google Gemini provider"""
+        # Only read from environment variable, never hardcode
         api_key = os.getenv(config.get("api_key_env", "GOOGLE_API_KEY"))
         if not api_key:
+            self.logger.warning("GOOGLE_API_KEY not found in environment variables")
             return None
         
         return ChatGoogleGenerativeAI(

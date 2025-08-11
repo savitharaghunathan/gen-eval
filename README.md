@@ -49,11 +49,16 @@ uv sync
 export OPENAI_API_KEY="your-openai-api-key"
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
 export GOOGLE_API_KEY="your-google-api-key"
+
+# Create your LLM configuration file
+# You'll need to specify the path to this file when using the framework
 ```
 
 ## Configuration
 
-GenEval uses a YAML configuration file for LLM provider management. Create `config/llm_config.yaml`:
+GenEval requires you to specify the path to your LLM configuration file. **API keys are never hardcoded - they are read from environment variables for security.**
+
+Create `llm_config.yaml` in your project directory:
 
 ```yaml
 providers:
@@ -89,17 +94,22 @@ settings:
 
 **Important:** Only one provider should have `default: true`. The framework will automatically select the default provider.
 
+### Sample Configuration File
+
+You can find a complete working example of the `llm_config.yaml` file in the project repository:
+
+- **Local path**: `config/llm_config.yaml` (in the project root)
+- **GitHub**: [https://github.com/savitharaghunathan/gen-eval/tree/main/config/llm_config.yaml](https://github.com/savitharaghunathan/gen-eval/tree/main/config/llm_config.yaml)
+
+The sample config includes all supported providers with proper settings. You can copy this file and modify it for your own use.
+
 ## Quick Start
 
 ```python
-from geneval import GenEvalFramework, LLMManager
+from geneval import GenEvalFramework
 
-# Initialize LLM manager (uses config file)
-llm_manager = LLMManager()
-llm_manager.select_provider()  # Selects default provider
-
-# Initialize framework
-framework = GenEvalFramework(llm_manager=llm_manager)
+# Initialize framework (handles LLM manager internally)
+framework = GenEvalFramework(config_path="path/to/your/llm_config.yaml")
 
 # Evaluate with multiple metrics
 results = framework.evaluate(
@@ -127,7 +137,7 @@ logging.basicConfig(
 )
 
 # Now import and use the package
-from geneval import GenEvalFramework, LLMManager
+from geneval import GenEvalFramework
 # All INFO, WARNING, and ERROR logs will now be visible
 ```
 
@@ -137,6 +147,7 @@ Run the interactive demo to test the framework:
 
 ```bash
 # Make sure you have the config file set up first
+# You can use the sample config at config/llm_config.yaml
 uv run python demo_interactive.py
 ```
 

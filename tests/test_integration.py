@@ -48,7 +48,7 @@ class TestEndToEndEvaluation:
     
     def test_single_metric_evaluation(self, llm_manager, test_data):
         """Test evaluation with a single metric"""
-        framework = GenEvalFramework(llm_manager=llm_manager)
+        framework = GenEvalFramework(config_path="config/llm_config.yaml")
         
         test_case = test_data['test_cases'][0]
         
@@ -76,7 +76,7 @@ class TestEndToEndEvaluation:
     
     def test_multiple_metrics_evaluation(self, llm_manager, test_data):
         """Test evaluation with multiple metrics"""
-        framework = GenEvalFramework(llm_manager=llm_manager)
+        framework = GenEvalFramework(config_path="config/llm_config.yaml")
         
         test_case = test_data['test_cases'][0]
         
@@ -100,7 +100,7 @@ class TestEndToEndEvaluation:
     
     def test_ragas_specific_evaluation(self, llm_manager, test_data):
         """Test RAGAS-specific metrics"""
-        framework = GenEvalFramework(llm_manager=llm_manager)
+        framework = GenEvalFramework(config_path="config/llm_config.yaml")
         
         test_case = test_data['test_cases'][0]
         
@@ -123,7 +123,7 @@ class TestEndToEndEvaluation:
     
     def test_deepeval_specific_evaluation(self, llm_manager, test_data):
         """Test DeepEval-specific metrics"""
-        framework = GenEvalFramework(llm_manager=llm_manager)
+        framework = GenEvalFramework(config_path="config/llm_config.yaml")
         
         test_case = test_data['test_cases'][0]
         
@@ -150,7 +150,7 @@ class TestRealWorldScenarios:
     
     def test_multiple_test_cases(self, llm_manager, test_data):
         """Test evaluation across multiple test cases"""
-        framework = GenEvalFramework(llm_manager=llm_manager)
+        framework = GenEvalFramework(config_path="config/llm_config.yaml")
         
         # Test first 3 cases
         for i in range(min(3, len(test_data['test_cases']))):
@@ -174,7 +174,7 @@ class TestRealWorldScenarios:
     
     def test_error_handling_real_apis(self, llm_manager):
         """Test error handling with real APIs"""
-        framework = GenEvalFramework(llm_manager=llm_manager)
+        framework = GenEvalFramework(config_path="config/llm_config.yaml")
         
         # Test with invalid data that should cause errors
         try:
@@ -199,7 +199,7 @@ class TestPerformanceAndReliability:
     
     def test_evaluation_consistency(self, llm_manager, test_data):
         """Test that evaluations are consistent"""
-        framework = GenEvalFramework(llm_manager=llm_manager)
+        framework = GenEvalFramework(config_path="config/llm_config.yaml")
         
         test_case = test_data['test_cases'][0]
         
@@ -228,7 +228,7 @@ class TestPerformanceAndReliability:
     
     def test_large_context_handling(self, llm_manager):
         """Test handling of large context"""
-        framework = GenEvalFramework(llm_manager=llm_manager)
+        framework = GenEvalFramework(config_path="config/llm_config.yaml")
         
         # Create large context
         large_context = "This is a test context. " * 1000  # ~25KB
