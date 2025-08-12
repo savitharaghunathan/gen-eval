@@ -1,6 +1,6 @@
 # GenEval
 
-A unified evaluation framework for RAG (Retrieval-Augmented Generation) applications. GenEval provides a standardized interface for evaluating generative AI models using multiple evaluation frameworks including RAGAS and DeepEval.
+A unified evaluation framework for Gen AI applications. GenEval provides a standardized interface for evaluating generative AI models using multiple evaluation frameworks including RAGAS and DeepEval.
 
 ## Overview
 
@@ -23,17 +23,17 @@ GenEval supports 9 unique metrics across both frameworks:
 - context_recall
 - context_entity_recall
 - noise_sensitivity
-- response_relevancy
+- answer_relevancy
 - faithfulness
 
 **DeepEval Metrics:**
-- answer_relevance
+- answer_relevancy
 - context_relevance
 - context_precision
 - context_recall
 - faithfulness
 
-Note: Some metrics like `faithfulness`, `context_precision`, and `context_recall` are available in both frameworks, giving you 12 total evaluations from 9 unique concepts.
+**Note**: Some metrics like `faithfulness`, `answer_relevancy`, and `context_recall` are available in both frameworks, giving you up to 12 total evaluations from 9 unique concepts.
 
 ## Installation
 
