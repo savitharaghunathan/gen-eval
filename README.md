@@ -175,12 +175,15 @@ gen-eval/
 │       ├── ragas_adapter.py    # RAGAS integration
 │       └── deepeval_adapter.py # DeepEval integration
 ├── tests/
+│   ├── test_framework.py       # Framework tests (14 tests)
+│   ├── test_ragas_adapter.py   # RAGAS adapter tests (47 tests)
+│   ├── test_deepeval_adapter.py # DeepEval adapter tests (34 tests)
+│   ├── test_llm_manager.py     # LLM manager tests (35 tests)
+│   ├── test_schemas.py         # Schema validation tests (17 tests)
 │   ├── test_data.yaml          # Test dataset
-│   ├── test_data_clean.yaml    # Clean test dataset
-│   ├── test_framework.py       # Unit tests (83 tests)
-│   └── test_integration.py     # Integration tests (8 tests)
+│   └── test_data_clean.yaml    # Clean test dataset
 ├── demo_interactive.py         # Interactive demo
-└── run_tests.py               # Batch testing script
+└── uv.lock                     # Dependency lock file
 ```
 
 ## Testing
@@ -188,44 +191,34 @@ gen-eval/
 ### Running Tests
 
 ```bash
-# Run all tests (unit + integration)
-python run_tests.py
-
-# Run only unit tests (fast, no external dependencies)
-python run_tests.py --unit
-
-# Run only integration tests (requires API keys)
-python run_tests.py --integration
+# Run all tests using uv 
+uv run pytest tests/ -v
 
 # Run tests with coverage report
-python run_tests.py --coverage
+uv run pytest tests/ --cov=geneval --cov-report=term-missing
+
+# Run specific test files
+uv run pytest tests/test_framework.py -v
+uv run pytest tests/test_ragas_adapter.py -v
+uv run pytest tests/test_deepeval_adapter.py -v
+uv run pytest tests/test_llm_manager.py -v
+uv run pytest tests/test_schemas.py -v
 
 # Run tests with verbose output
-python run_tests.py --verbose
+uv run pytest tests/ -v -s
 ```
-
-### Test Coverage
-
-- **Unit Tests (83 tests)**: Fast, isolated tests with mocked dependencies
-  - Schema validation tests
-  - LLM manager tests 
-  - Adapter functionality tests
-  - Framework integration tests
-  - Error handling tests
-
-- **Integration Tests (8 tests)**: End-to-end tests with real external dependencies
-  - Complete evaluation workflows
-  - Real API calls (when keys available)
-  - Performance and reliability tests
-  - Real-world usage scenarios
 
 ### Test Structure
 
 ```
 tests/
-├── test_framework.py      # Unit tests (83 tests)
-├── test_integration.py    # Integration tests (8 tests)
-├── test_data.yaml         # Test dataset (not included in repo)
+├── test_framework.py           # Framework tests (14 tests)
+├── test_ragas_adapter.py       # RAGAS adapter tests (47 tests)
+├── test_deepeval_adapter.py    # DeepEval adapter tests (34 tests)
+├── test_llm_manager.py         # LLM manager tests (35 tests)
+├── test_schemas.py             # Schema validation tests (17 tests)
+├── test_data.yaml              # Test dataset
+└── test_data_clean.yaml        # Clean test dataset
 ```
 
 ### Test Data Format
@@ -245,20 +238,6 @@ test_cases:
     retrieved_contexts: "Basic arithmetic: 2+2 equals 4."
     response: "2+2 equals 4."
     reference: "4"
-```
-
-### Running Integration Tests
-
-Integration tests require API keys to run:
-
-```bash
-# Set your API key
-export OPENAI_API_KEY="your-openai-api-key"
-# or
-export ANTHROPIC_API_KEY="your-anthropic-api-key"
-
-# Run integration tests
-python run_tests.py --integration
 ```
 
 ## Output Format
