@@ -81,18 +81,21 @@ def get_user_preferences():
         "context_recall", 
         "context_entity_recall",
         "noise_sensitivity",
-        "response_relevancy",
+        "answer_relevancy",
         "faithfulness",
-        "answer_relevance",
-        "context_relevance"
+        "context_relevance",
+        "context_precision"
     ]
     
-    print(f"\nAvailable metrics (9 unique):")
+    print(f"\nAvailable metrics ( 9 unique):")
     for i, metric in enumerate(unique_metrics, 1):
         print(f"{i:2d}. {metric}")
     
+    print(f"\nNote: Some metrics (like 'faithfulness') are available in both RAGAS and DeepEval.")
+    print(f"This will give you up to 12 total evaluations from  9 unique concepts.")
+    
     print(f"\nMetric selection:")
-    print("- Enter 'all' for all 9 metrics")
+    print("- Enter 'all' for all  9 metrics (will run 12 evaluations)")
     print("- Enter numbers (comma-separated, e.g., 1,3,6)")
     
     while True:
@@ -107,7 +110,7 @@ def get_user_preferences():
                     selected_metrics = [unique_metrics[i] for i in indices]
                     break
                 else:
-                    print("Invalid metric numbers. Please use numbers 1-9.")
+                    print("Invalid metric numbers. Please use numbers 1- 9.")
             except ValueError:
                 print("Please enter 'all' or numbers separated by commas (e.g., 1,3,6)")
     
@@ -188,6 +191,14 @@ def display_final_summary(all_results, metrics, num_cases):
     print(f"FINAL SUMMARY - {num_cases} Test Cases")
     print(f"{'='*100}")
     
+    # Show which metrics ran in both frameworks
+    ragas_metrics = [m for m in metrics if m.startswith("ragas.")]
+    deepeval_metrics = [m for m in metrics if m.startswith("deepeval.")]
+    
+    print(f"Total evaluations: {len(metrics)} ({len(ragas_metrics)} RAGAS + {len(deepeval_metrics)} DeepEval)")
+    print(f"Unique concepts: {len(set([m.split('.', 1)[1] for m in metrics]))}")
+    print(f"{'='*100}")
+    
     adapter_metric_scores = calculate_test_case_stats(all_results)
     
     print(f"{'Adapter.Metric':<40} {'Cases':<8} {'Avg Score':<12} {'Min':<8} {'Max':<8}")
@@ -248,6 +259,24 @@ def main():
     print(f"   Test cases: {num_cases}")
     print(f"   Selected metrics: {len(selected_metrics)} unique ({', '.join(selected_metrics)})")
     print(f"   Framework evaluations: {len(metrics)} total ({', '.join(metrics)})")
+    
+    # Show which metrics will run in both frameworks
+    ragas_metrics = [m for m in metrics if m.startswith("ragas.")]
+    deepeval_metrics = [m for m in metrics if m.startswith("deepeval.")]
+    
+    print(f"\nFramework breakdown:")
+    print(f"   RAGAS evaluations: {len(ragas_metrics)} ({', '.join(ragas_metrics)})")
+    print(f"   DeepEval evaluations: {len(deepeval_metrics)} ({', '.join(deepeval_metrics)})")
+    
+    # Show overlapping metrics
+    overlapping = []
+    for metric in selected_metrics:
+        if metric in ["faithfulness", "answer_relevancy", "context_recall"]:
+            overlapping.append(metric)
+    
+    if overlapping:
+        print(f"\nOverlapping metrics (run in both frameworks): {', '.join(overlapping)}")
+        print(f"Expected total: {len(selected_metrics) + len(overlapping)} evaluations")
     
     # Initialize framework with config path
     print(f"\nInitializing GenEval Framework...")

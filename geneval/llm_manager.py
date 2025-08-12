@@ -1,8 +1,8 @@
 """
-LLM Manager using LangChain for GenEval framework.
+LLM Manager for GenEval framework.
 
-This module provides a unified interface for multiple LLM providers using LangChain.
-Users must specify the path to their LLM configuration file.
+This module provides configuration management for multiple LLM providers.
+It serves as a configuration store that adapters can use to create their own LLM instances.
 """
 
 import logging
@@ -11,15 +11,9 @@ import yaml
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-from langchain.llms.base import LLM
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.llms import Ollama
-
 
 class LLMManager:
-    """Manages LLM providers with lazy initialization"""
+    """Manages LLM provider configurations"""
     
     def __init__(self, config_path: str):
         """
@@ -38,11 +32,8 @@ class LLMManager:
         self.config = self._load_config()
         self._validate_config()
         
-        # Store provider configurations for lazy initialization
+        # Store provider configurations
         self.provider_configs = {}
-        self.providers = {}  # Will store actual LLM instances when created
-        self.selected_provider = None
-        self.selected_model = None
         
         # Store enabled provider configurations
         providers_config = self.config.get("providers", {})
@@ -67,224 +58,6 @@ class LLMManager:
             self.logger.error(error_msg)
             raise RuntimeError(error_msg)
     
-    def _get_or_create_provider(self, provider_name: str) -> Optional[LLM]:
-        """Get existing provider or create it lazily"""
-        # Return existing provider if already created
-        if provider_name in self.providers:
-            return self.providers[provider_name]
-        
-        # Create provider if configuration exists
-        if provider_name in self.provider_configs:
-            try:
-                provider_config = self.provider_configs[provider_name]
-                llm = self._create_llm_provider(provider_name, provider_config)
-                if llm:
-                    self.providers[provider_name] = llm
-                    self.logger.info(f"Lazily initialized {provider_name} provider")
-                    return llm
-                else:
-                    self.logger.warning(f"Failed to create {provider_name} provider")
-                    return None
-            except Exception as e:
-                self.logger.error(f"Error creating {provider_name} provider: {e}")
-                return None
-        
-        self.logger.warning(f"Provider {provider_name} not configured or not enabled")
-        return None
-    
-    def _create_llm_provider(self, provider_name: str, config: Dict[str, Any]) -> Optional[LLM]:
-        """Create LLM provider instance"""
-        try:
-            if provider_name == "openai":
-                return self._create_openai_provider(config)
-            elif provider_name == "anthropic":
-                return self._create_anthropic_provider(config)
-            elif provider_name == "gemini":
-                return self._create_gemini_provider(config)
-            elif provider_name == "ollama":
-                return self._create_ollama_provider(config)
-            else:
-                self.logger.warning(f"Unknown provider: {provider_name}")
-                return None
-        except Exception as e:
-            self.logger.error(f"Error creating {provider_name} provider: {e}")
-            return None
-    
-    def _create_openai_provider(self, config: Dict[str, Any]) -> Optional[ChatOpenAI]:
-        """Create OpenAI provider"""
-        # Only read from environment variable, never hardcode
-        api_key = os.getenv(config.get("api_key_env", "OPENAI_API_KEY"))
-        if not api_key:
-            self.logger.warning("OPENAI_API_KEY not found in environment variables")
-            return None
-        
-        return ChatOpenAI(
-            model=config.get("model", "gpt-4o-mini"),
-            temperature=self.config["settings"]["temperature"],
-            max_tokens=self.config["settings"]["max_tokens"],
-            timeout=self.config["settings"]["timeout"]
-        )
-    
-    def _create_anthropic_provider(self, config: Dict[str, Any]) -> Optional[ChatAnthropic]:
-        """Create Anthropic provider"""
-        # Only read from environment variable, never hardcode
-        api_key = os.getenv(config.get("api_key_env", "ANTHROPIC_API_KEY"))
-        if not api_key:
-            self.logger.warning("ANTHROPIC_API_KEY not found in environment variables")
-            return None
-        
-        return ChatAnthropic(
-            model=config.get("model", "claude-3-5-haiku-20241022"),
-            temperature=self.config["settings"]["temperature"],
-            max_tokens=self.config["settings"]["max_tokens"]
-        )
-    
-    def _create_gemini_provider(self, config: Dict[str, Any]) -> Optional[ChatGoogleGenerativeAI]:
-        """Create Google Gemini provider"""
-        # Only read from environment variable, never hardcode
-        api_key = os.getenv(config.get("api_key_env", "GOOGLE_API_KEY"))
-        if not api_key:
-            self.logger.warning("GOOGLE_API_KEY not found in environment variables")
-            return None
-        
-        return ChatGoogleGenerativeAI(
-            model=config.get("model", "gemini-1.5-flash"),
-            temperature=self.config["settings"]["temperature"],
-            max_output_tokens=self.config["settings"]["max_tokens"]
-        )
-    
-    def _create_ollama_provider(self, config: Dict[str, Any]) -> Optional[Ollama]:
-        """Create Ollama provider"""
-        base_url = config.get("base_url", "http://localhost:11434")
-        
-        return Ollama(
-            model=config.get("model", "llama3.2"),
-            base_url=base_url,
-            temperature=self.config["settings"]["temperature"]
-        )
-    
-    def select_provider(self, provider_name: Optional[str] = None) -> bool:
-        """
-        Select a specific provider or auto-detect
-        
-        Args:
-            provider_name: Name of provider to select, or None for auto-detection
-            
-        Returns:
-            True if provider was successfully selected
-        """
-        if provider_name:
-            # Try to get or create the specified provider
-            provider = self._get_or_create_provider(provider_name)
-            if provider:
-                self.selected_provider = provider_name
-                self.selected_model = self.provider_configs[provider_name]["model"]
-                self.logger.info(f"Selected provider: {provider_name} with model: {self.selected_model}")
-                return True
-            else:
-                self.logger.error(f"Provider not available: {provider_name}")
-                return False
-        else:
-            # Use default provider from config
-            available_providers = list(self.provider_configs.keys())
-            if not available_providers:
-                self.logger.error("No LLM providers configured")
-                return False
-            
-            # Find provider marked as default
-            default_providers = [
-                p for p in available_providers 
-                if self.provider_configs[p].get("default", False)
-            ]
-            
-            if default_providers:
-                # Try to get or create the default provider
-                provider = self._get_or_create_provider(default_providers[0])
-                if provider:
-                    self.selected_provider = default_providers[0]
-                    self.selected_model = self.provider_configs[default_providers[0]]["model"]
-                    self.logger.info(f"Auto-selected default provider: {self.selected_provider} with model: {self.selected_model}")
-                    return True
-                else:
-                    self.logger.error(f"Failed to initialize default provider: {default_providers[0]}")
-                    return False
-            else:
-                self.logger.error("No default provider configured. Please set 'default: true' for one provider in the config.")
-                return False
-    
-    def get_llm_info(self) -> Dict[str, str]:
-        """
-        Get information about the currently selected LLM
-        
-        Returns:
-            Dictionary with provider and model information
-        """
-        if not self.selected_provider:
-            return {}
-        
-        return {
-            "provider": self.selected_provider,
-            "model": self.selected_model,
-            "provider_config": self.provider_configs.get(self.selected_provider, {})
-        }
-    
-    def get_llm(self) -> Optional[LLM]:
-        """Get the selected LLM instance"""
-        if not self.selected_provider:
-            if not self.select_provider():
-                return None
-        
-        return self.providers.get(self.selected_provider)
-    
-    def get_provider_name(self) -> Optional[str]:
-        """Get the name of the selected provider"""
-        return self.selected_provider
-    
-    def get_model_name(self) -> Optional[str]:
-        """Get the name of the selected model"""
-        return self.selected_model
-    
-    def get_available_providers(self) -> List[str]:
-        """Get list of configured providers (not necessarily initialized)"""
-        return list(self.provider_configs.keys())
-    
-    def get_initialized_providers(self) -> List[str]:
-        """Get list of providers that have been initialized"""
-        return list(self.providers.keys())
-    
-    def is_provider_available(self, provider_name: str) -> bool:
-        """Check if a provider is available (configured and can be initialized)"""
-        if provider_name not in self.provider_configs:
-            return False
-        
-        # Try to get or create the provider
-        provider = self._get_or_create_provider(provider_name)
-        return provider is not None
-    
-    def configure_for_ragas(self) -> Dict[str, Any]:
-        """Configure LLM for RAGAS framework"""
-        llm = self.get_llm()
-        if not llm:
-            return {}
-        
-        return {
-            "llm": llm,
-            "provider": self.selected_provider,
-            "model": self.selected_model
-        }
-    
-    def configure_for_deepeval(self) -> Dict[str, Any]:
-        """Configure LLM for DeepEval framework"""
-        llm = self.get_llm()
-        if not llm:
-            return {}
-        
-        return {
-            "llm": llm,
-            "provider": self.selected_provider,
-            "model": self.selected_model
-        }
-    
     def _validate_config(self):
         """Validate configuration to ensure exactly one provider is marked as default"""
         providers_config = self.config.get("providers", {})
@@ -299,4 +72,92 @@ class LLMManager:
         elif len(default_providers) == 0:
             self.logger.warning("No provider marked as default. Please set 'default: true' for one provider in the config.")
         else:
-            self.logger.info(f"Default provider: {default_providers[0]}") 
+            self.logger.info(f"Default provider: {default_providers[0]}")
+    
+    def get_default_provider(self) -> Optional[str]:
+        """Get the name of the default provider"""
+        providers_config = self.config.get("providers", {})
+        for provider_name, provider_config in providers_config.items():
+            if provider_config.get("default", False):
+                return provider_name
+        return None
+    
+    def get_provider_config(self, provider_name: str) -> Dict[str, Any]:
+        """Get configuration for a specific provider"""
+        return self.provider_configs.get(provider_name, {})
+    
+    def get_global_settings(self) -> Dict[str, Any]:
+        """Get global settings"""
+        return self.config.get('settings', {})
+    
+    def get_api_key(self, provider_name: str) -> Optional[str]:
+        """Get API key for a provider from environment variables"""
+        provider_config = self.provider_configs.get(provider_name, {})
+        api_key_env = provider_config.get("api_key_env")
+        
+        if api_key_env:
+            return os.getenv(api_key_env)
+        
+        # Fallback to common environment variable names
+        if provider_name == "openai":
+            return os.getenv("OPENAI_API_KEY")
+        elif provider_name == "anthropic":
+            return os.getenv("ANTHROPIC_API_KEY")
+        elif provider_name == "gemini":
+            return os.getenv("GOOGLE_API_KEY")
+        elif provider_name == "deepseek":
+            return os.getenv("DEEPSEEK_API_KEY")
+        
+        return None
+    
+    def get_available_providers(self) -> List[str]:
+        """Get list of configured providers"""
+        return list(self.provider_configs.keys())
+    
+    def is_provider_available(self, provider_name: str) -> bool:
+        """Check if a provider is available (configured and enabled)"""
+        return provider_name in self.provider_configs
+    
+    def get_deepeval_config(self, provider_name: str) -> Dict[str, Any]:
+        """Get DeepEval-compatible configuration for a provider"""
+        provider_config = self.provider_configs.get(provider_name, {})
+        global_settings = self.config.get('settings', {})
+        
+        # Base configuration
+        deepeval_config = {
+            "model": provider_config.get("model"),
+            "temperature": global_settings.get("temperature", 0.1),
+        }
+        
+        # Add provider-specific configurations
+        if provider_name == "openai":
+            # OpenAI uses environment variables, no additional config needed
+            pass
+        elif provider_name == "azure_openai":
+            deepeval_config.update({
+                "deployment_name": provider_config.get("deployment_name"),
+                "azure_openai_api_key": provider_config.get("azure_openai_api_key"),
+                "openai_api_version": provider_config.get("openai_api_version", "2025-01-01-preview"),
+                "azure_endpoint": provider_config.get("azure_endpoint"),
+            })
+        elif provider_name == "anthropic":
+            # Anthropic uses environment variables, no additional config needed
+            pass
+        elif provider_name == "amazon_bedrock":
+            deepeval_config.update({
+                "region_name": provider_config.get("region_name", "us-east-1"),
+            })
+        elif provider_name == "gemini":
+            deepeval_config.update({
+                "api_key": self.get_api_key(provider_name),
+            })
+        elif provider_name == "deepseek":
+            deepeval_config.update({
+                "api_key": self.get_api_key(provider_name),
+            })
+        elif provider_name == "ollama":
+            deepeval_config.update({
+                "base_url": provider_config.get("base_url", "http://localhost:11434"),
+            })
+        
+        return deepeval_config 

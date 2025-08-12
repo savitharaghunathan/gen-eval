@@ -28,16 +28,14 @@ class GenEvalFramework:
         self.logger = logging.getLogger(__name__)
         self.logger.info("Initializing GenEvalFramework")
         
-        # Initialize LLM manager with the provided config path
+        # Initialize LLM manager for configuration management
         self.llm_manager = LLMManager(config_path=config_path)
+        self.llm_info = {
+            "provider": self.llm_manager.get_default_provider(),
+            "model": self.llm_manager.get_provider_config(self.llm_manager.get_default_provider()).get("model", "unknown")
+        }
         
-        # Select default provider from config
-        if not self.llm_manager.select_provider():
-            raise ValueError("No default LLM provider configured. Please set 'default: true' for one provider in the config.")
-        
-        self.llm_info = self.llm_manager.get_llm_info()
-        
-        # Initialize adapters with LLM manager (required)
+        # Initialize adapters (both get LLM manager for consistency)
         try:
             self.adapters = {
                 "ragas": RAGASAdapter(self.llm_manager),
