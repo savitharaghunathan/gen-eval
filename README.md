@@ -1,6 +1,6 @@
 # GenEval
 
-A unified evaluation framework for RAG (Retrieval-Augmented Generation) applications. GenEval provides a standardized interface for evaluating generative AI models using multiple evaluation frameworks including RAGAS and DeepEval.
+A unified evaluation framework for Gen AI applications. GenEval provides a standardized interface for evaluating generative AI models using multiple evaluation frameworks including RAGAS and DeepEval.
 
 ## Overview
 
@@ -11,6 +11,7 @@ Key benefits:
 - Consistent output format across all frameworks
 - Support for 9 unique evaluation metrics
 - Clean JSON output for easy integration
+- config-driven LLM management supporting OpenAI, Anthropic, Google Gemini, and Ollama
 
 ## Supported Metrics
 
@@ -22,17 +23,17 @@ GenEval supports 9 unique metrics across both frameworks:
 - context_recall
 - context_entity_recall
 - noise_sensitivity
-- response_relevancy
+- answer_relevancy
 - faithfulness
 
 **DeepEval Metrics:**
-- answer_relevance
+- answer_relevancy
 - context_relevance
 - context_precision
 - context_recall
 - faithfulness
 
-Note: Some metrics like `faithfulness`, `context_precision`, and `context_recall` are available in both frameworks, giving you 12 total evaluations from 9 unique concepts.
+**Note**: Some metrics like `faithfulness`, `answer_relevancy`, and `context_recall` are available in both frameworks, giving you up to 12 total evaluations from 9 unique concepts.
 
 ## Installation
 
@@ -44,18 +45,71 @@ cd gen-eval
 # Install dependencies using uv
 uv sync
 
-# Set your OpenAI API key
+# Set your API keys
 export OPENAI_API_KEY="your-openai-api-key"
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+export GOOGLE_API_KEY="your-google-api-key"
+
+# Create your LLM configuration file
+# You'll need to specify the path to this file when using the framework
 ```
+
+## Configuration
+
+GenEval requires you to specify the path to your LLM configuration file. **API keys are never hardcoded - they are read from environment variables for security.**
+
+Create `llm_config.yaml` in your project directory:
+
+```yaml
+providers:
+  openai:
+    enabled: true
+    default: true
+    api_key_env: "OPENAI_API_KEY"
+    model: "gpt-4o-mini"
+  
+  anthropic:
+    enabled: true
+    default: false
+    api_key_env: "ANTHROPIC_API_KEY"
+    model: "claude-3-5-haiku-20241022"
+  
+  gemini:
+    enabled: true
+    default: false
+    api_key_env: "GOOGLE_API_KEY"
+    model: "gemini-1.5-flash"
+  
+  ollama:
+    enabled: true
+    default: false
+    base_url: "http://localhost:11434"
+    model: "llama3.2"
+
+settings:
+  temperature: 0.1
+  max_tokens: 1000
+  timeout: 30
+```
+
+**Important:** Only one provider should have `default: true`. The framework will automatically select the default provider.
+
+### Sample Configuration File
+
+You can find a complete working example of the `llm_config.yaml` file in the project repository:
+
+- **Local path**: `config/llm_config.yaml` (in the project root)
+- **GitHub**: [https://github.com/savitharaghunathan/gen-eval/tree/main/config/llm_config.yaml](https://github.com/savitharaghunathan/gen-eval/tree/main/config/llm_config.yaml)
+
+The sample config includes all supported providers with proper settings. You can copy this file and modify it for your own use.
 
 ## Quick Start
 
 ```python
-from geneval import GenEvalFramework, LLMInitializer
+from geneval import GenEvalFramework
 
-# Initialize with OpenAI
-llm_init = LLMInitializer(provider="openai")
-framework = GenEvalFramework(llm_initializer=llm_init)
+# Initialize framework (handles LLM manager internally)
+framework = GenEvalFramework(config_path="path/to/your/llm_config.yaml")
 
 # Evaluate with multiple metrics
 results = framework.evaluate(
@@ -67,6 +121,7 @@ results = framework.evaluate(
 )
 # Results contain evaluations from both RAGAS and DeepEval
 print(results)
+```
 
 ### Logging Configuration
 
@@ -82,7 +137,7 @@ logging.basicConfig(
 )
 
 # Now import and use the package
-from geneval import GenEvalFramework, LLMInitializer
+from geneval import GenEvalFramework
 # All INFO, WARNING, and ERROR logs will now be visible
 ```
 
@@ -91,14 +146,16 @@ from geneval import GenEvalFramework, LLMInitializer
 Run the interactive demo to test the framework:
 
 ```bash
-python demo_interactive.py
+# Make sure you have the config file set up first
+# You can use the sample config at config/llm_config.yaml
+uv run python demo_interactive.py
 ```
 
 The demo allows you to:
-- Choose between OpenAI and Anthropic providers
+- Use config-driven LLM provider selection
 - Select specific metrics or run all metrics
-- Control the number of test cases
-- Get clean JSON output
+- Control the number of test cases (1-10)
+- Get clean JSON output with detailed statistics
 
 ## Project Structure
 
@@ -106,36 +163,27 @@ The demo allows you to:
 gen-eval/
 ├── pyproject.toml
 ├── README.md
+├── config/
+│   └── llm_config.yaml        # LLM provider configuration
 ├── geneval/
 │   ├── __init__.py
 │   ├── schemas.py              # Pydantic models
 │   ├── framework.py            # Main evaluation framework
-│   ├── llm.py                 # LLM initialization
-│   ├── normalization.py       # Score normalization utilities
+│   ├── llm_manager.py          # LLM provider management
+│   ├── normalization.py        # Score normalization utilities
 │   └── adapters/
-│       ├── ragas_adapter.py   # RAGAS integration
+│       ├── ragas_adapter.py    # RAGAS integration
 │       └── deepeval_adapter.py # DeepEval integration
 ├── tests/
-│   ├── test_data.yaml         # Test dataset
-│   ├── test_data_clean.yaml   # Clean test dataset
-│   └── test_framework.py      # Test suite
-├── demo_interactive.py        # Interactive demo
-└── run_tests.py              # Batch testing script
-```
-
-## Configuration
-
-GenEval uses GPT-4o-mini by default for cost-effective evaluations. You can configure different providers:
-
-```python
-# OpenAI (default: gpt-4o-mini)
-llm_init = LLMInitializer(provider="openai")
-
-# Anthropic (default: claude-3-5-haiku)
-llm_init = LLMInitializer(provider="anthropic")
-
-# Auto-detect (tries OpenAI first, then Anthropic)
-llm_init = LLMInitializer(provider="auto")
+│   ├── test_framework.py       # Framework tests (14 tests)
+│   ├── test_ragas_adapter.py   # RAGAS adapter tests (47 tests)
+│   ├── test_deepeval_adapter.py # DeepEval adapter tests (34 tests)
+│   ├── test_llm_manager.py     # LLM manager tests (35 tests)
+│   ├── test_schemas.py         # Schema validation tests (17 tests)
+│   ├── test_data.yaml          # Test dataset
+│   └── test_data_clean.yaml    # Clean test dataset
+├── demo_interactive.py         # Interactive demo
+└── uv.lock                     # Dependency lock file
 ```
 
 ## Testing
@@ -143,45 +191,34 @@ llm_init = LLMInitializer(provider="auto")
 ### Running Tests
 
 ```bash
-# Run all tests (unit + integration)
-python run_tests.py
-
-# Run only unit tests (fast, no external dependencies)
-python run_tests.py --unit
-
-# Run only integration tests (requires API keys)
-python run_tests.py --integration
+# Run all tests using uv 
+uv run pytest tests/ -v
 
 # Run tests with coverage report
-python run_tests.py --coverage
+uv run pytest tests/ --cov=geneval --cov-report=term-missing
+
+# Run specific test files
+uv run pytest tests/test_framework.py -v
+uv run pytest tests/test_ragas_adapter.py -v
+uv run pytest tests/test_deepeval_adapter.py -v
+uv run pytest tests/test_llm_manager.py -v
+uv run pytest tests/test_schemas.py -v
 
 # Run tests with verbose output
-python run_tests.py --verbose
+uv run pytest tests/ -v -s
 ```
-
-### Test Coverage
-
-- **Unit Tests (40 tests)**: Fast, isolated tests with mocked dependencies
-  - Schema validation tests
-  - LLM initialization tests
-  - Adapter functionality tests
-  - Framework integration tests
-  - Error handling tests
-  - **Coverage: 95%**
-
-- **Integration Tests (8 tests)**: End-to-end tests with real external dependencies
-  - Complete evaluation workflows
-  - Real API calls (when keys available)
-  - Performance and reliability tests
-  - Real-world usage scenarios
 
 ### Test Structure
 
 ```
 tests/
-├── test_framework.py      # Unit tests (40 tests)
-├── test_integration.py    # Integration tests (8 tests)
-├── test_data.yaml         # Test dataset (not included in repo)
+├── test_framework.py           # Framework tests (14 tests)
+├── test_ragas_adapter.py       # RAGAS adapter tests (47 tests)
+├── test_deepeval_adapter.py    # DeepEval adapter tests (34 tests)
+├── test_llm_manager.py         # LLM manager tests (35 tests)
+├── test_schemas.py             # Schema validation tests (17 tests)
+├── test_data.yaml              # Test dataset
+└── test_data_clean.yaml        # Clean test dataset
 ```
 
 ### Test Data Format
@@ -203,25 +240,9 @@ test_cases:
     reference: "4"
 ```
 
-### Running Integration Tests
-
-Integration tests require API keys to run:
-
-```bash
-# Set your API key
-export OPENAI_API_KEY="your-openai-api-key"
-# or
-export ANTHROPIC_API_KEY="your-anthropic-api-key"
-
-# Run integration tests
-python run_tests.py --integration
-```
-
-
-
 ## Output Format
 
-GenEval returns consistent JSON output:
+GenEval returns consistent JSON output with LLM provider information:
 
 ```json
 {
@@ -237,7 +258,9 @@ GenEval returns consistent JSON output:
     "metadata": {
       "framework": "ragas",
       "total_metrics": 1,
-      "evaluation_successful": true
+      "evaluation_successful": true,
+      "llm_provider": "openai",
+      "llm_model": "gpt-4o-mini"
     }
   },
   "deepeval.faithfulness": {
@@ -253,10 +276,11 @@ GenEval returns consistent JSON output:
       "framework": "deepeval",
       "total_metrics": 1,
       "evaluation_successful": true,
-      "test_case_count": 1
+      "test_case_count": 1,
+      "llm_provider": "openai",
+      "llm_model": "gpt-4o-mini"
     }
   }
 }
-
 ```
 

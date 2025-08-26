@@ -23,7 +23,7 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from geneval import GenEvalFramework, LLMInitializer
+from geneval import GenEvalFramework
 
 def load_test_data():
     """Load test data from YAML file"""
@@ -41,27 +41,23 @@ def get_user_preferences():
     print("GenEval Framework Interactive Demo")
     print("=" * 50)
     
-    # LLM Provider selection
-    print(f"\nLLM Provider:")
-    print("1. OpenAI (requires OPENAI_API_KEY)")
-    print("2. Anthropic (requires ANTHROPIC_API_KEY)")
-    print("3. Auto-detect (try both)")
+    # Check if config file exists
+    config_path = project_root / "config" / "llm_config.yaml"
+    if not config_path.exists():
+        print(f"\n LLM configuration file not found: {config_path}")
+        print("Please create a config file with your LLM provider settings.")
+        print("Example config:")
+        print("  providers:")
+        print("    openai:")
+        print("      enabled: true")
+        print("      default: true")
+        print("      api_key_env: \"OPENAI_API_KEY\"")
+        print("      model: \"gpt-4o-mini\"")
+        print("\nExiting demo - please configure your LLM settings first.")
+        return None, None
     
-    while True:
-        provider_choice = input("\nChoose LLM provider (1-3, default: 3): ").strip()
-        if not provider_choice:
-            provider_choice = "3"
-        if provider_choice in ["1", "2", "3"]:
-            break
-        print("Please enter 1, 2, or 3")
-    
-    # Map choice to provider name
-    provider_map = {
-        "1": "openai",
-        "2": "anthropic", 
-        "3": "auto"
-    }
-    llm_provider = provider_map[provider_choice]
+    print(f"\nUsing LLM configuration from: {config_path}")
+    print("The framework will use the default provider from your config file.")
     
     # Number of test cases
     while True:
@@ -85,18 +81,21 @@ def get_user_preferences():
         "context_recall", 
         "context_entity_recall",
         "noise_sensitivity",
-        "response_relevancy",
+        "answer_relevancy",
         "faithfulness",
-        "answer_relevance",
-        "context_relevance"
+        "context_relevance",
+        "context_precision"
     ]
     
-    print(f"\nAvailable metrics (9 unique):")
+    print(f"\nAvailable metrics ( 9 unique):")
     for i, metric in enumerate(unique_metrics, 1):
         print(f"{i:2d}. {metric}")
     
+    print(f"\nNote: Some metrics (like 'faithfulness') are available in both RAGAS and DeepEval.")
+    print(f"This will give you up to 12 total evaluations from  9 unique concepts.")
+    
     print(f"\nMetric selection:")
-    print("- Enter 'all' for all 9 metrics")
+    print("- Enter 'all' for all  9 metrics (will run 12 evaluations)")
     print("- Enter numbers (comma-separated, e.g., 1,3,6)")
     
     while True:
@@ -111,11 +110,11 @@ def get_user_preferences():
                     selected_metrics = [unique_metrics[i] for i in indices]
                     break
                 else:
-                    print("Invalid metric numbers. Please use numbers 1-9.")
+                    print("Invalid metric numbers. Please use numbers 1- 9.")
             except ValueError:
                 print("Please enter 'all' or numbers separated by commas (e.g., 1,3,6)")
     
-    return int(num_cases), selected_metrics, llm_provider
+    return int(num_cases), selected_metrics
 
 def convert_to_framework_metrics(selected_metrics, test_data):
     """Convert unique metrics to framework-specific format"""
@@ -192,6 +191,14 @@ def display_final_summary(all_results, metrics, num_cases):
     print(f"FINAL SUMMARY - {num_cases} Test Cases")
     print(f"{'='*100}")
     
+    # Show which metrics ran in both frameworks
+    ragas_metrics = [m for m in metrics if m.startswith("ragas.")]
+    deepeval_metrics = [m for m in metrics if m.startswith("deepeval.")]
+    
+    print(f"Total evaluations: {len(metrics)} ({len(ragas_metrics)} RAGAS + {len(deepeval_metrics)} DeepEval)")
+    print(f"Unique concepts: {len(set([m.split('.', 1)[1] for m in metrics]))}")
+    print(f"{'='*100}")
+    
     adapter_metric_scores = calculate_test_case_stats(all_results)
     
     print(f"{'Adapter.Metric':<40} {'Cases':<8} {'Avg Score':<12} {'Min':<8} {'Max':<8}")
@@ -231,17 +238,6 @@ def display_final_summary(all_results, metrics, num_cases):
         else:
             print("  No results available")
 
-def initialize_llm(provider):
-    """Initialize LLM based on provider choice"""
-    try:
-        print(f"Initializing {provider.upper()}...")
-        llm_initializer = LLMInitializer(provider=provider)
-        print(f"{provider.upper()} initialized successfully")
-        return llm_initializer, provider
-    except Exception as e:
-        print(f"{provider.upper()} failed: {e}")
-        return None, None
-
 def main():
     """Main demo function"""
     # Load test data
@@ -250,32 +246,49 @@ def main():
         return
     
     # Get user preferences
-    num_cases, selected_metrics, llm_provider = get_user_preferences()
+    preferences = get_user_preferences()
+    if preferences[0] is None:
+        return
+    num_cases, selected_metrics = preferences
     
     # Convert unique metrics to framework-specific format
     metrics = convert_to_framework_metrics(selected_metrics, test_data)
     
     print(f"\nConfiguration:")
-    print(f"   LLM Provider: {llm_provider}")
+    print(f"   LLM Provider: Config-driven")
     print(f"   Test cases: {num_cases}")
     print(f"   Selected metrics: {len(selected_metrics)} unique ({', '.join(selected_metrics)})")
     print(f"   Framework evaluations: {len(metrics)} total ({', '.join(metrics)})")
     
-    # Initialize LLM
-    print(f"\nInitializing LLM...")
-    llm_initializer, actual_provider = initialize_llm(llm_provider)
+    # Show which metrics will run in both frameworks
+    ragas_metrics = [m for m in metrics if m.startswith("ragas.")]
+    deepeval_metrics = [m for m in metrics if m.startswith("deepeval.")]
     
-    if not llm_initializer:
-        print("No LLM provider available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY")
-        print("GenEval requires an LLM to perform evaluations")
-        print("Exiting demo - please configure your API keys and try again")
-        return
-    else:
-        print(f"Using {actual_provider.upper()} as LLM provider")
+    print(f"\nFramework breakdown:")
+    print(f"   RAGAS evaluations: {len(ragas_metrics)} ({', '.join(ragas_metrics)})")
+    print(f"   DeepEval evaluations: {len(deepeval_metrics)} ({', '.join(deepeval_metrics)})")
     
-    # Initialize framework with LLM
+    # Show overlapping metrics
+    overlapping = []
+    for metric in selected_metrics:
+        if metric in ["faithfulness", "answer_relevancy", "context_recall"]:
+            overlapping.append(metric)
+    
+    if overlapping:
+        print(f"\nOverlapping metrics (run in both frameworks): {', '.join(overlapping)}")
+        print(f"Expected total: {len(selected_metrics) + len(overlapping)} evaluations")
+    
+    # Initialize framework with config path
     print(f"\nInitializing GenEval Framework...")
-    framework = GenEvalFramework(llm_initializer=llm_initializer)
+    try:
+        config_path = str(project_root / "config" / "llm_config.yaml")
+        framework = GenEvalFramework(config_path=config_path)
+        print("Framework initialized successfully")
+    except Exception as e:
+        print(f"Framework initialization failed: {e}")
+        print("Please check your config file and API keys.")
+        print("Exiting demo - please configure your LLM settings and try again")
+        return
     
     # Run evaluations
     all_results = []

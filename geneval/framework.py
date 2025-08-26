@@ -9,7 +9,7 @@ import logging
 from typing import Dict
 from geneval.adapters.ragas_adapter import RAGASAdapter
 from geneval.adapters.deepeval_adapter import DeepEvalAdapter
-from geneval.llm import LLMInitializer
+from geneval.llm_manager import LLMManager
 from geneval.schemas import Input, Output
 
 
@@ -18,23 +18,35 @@ class GenEvalFramework:
     Main framework for evaluating LLMs using multiple evaluation frameworks
     """
     
-    def __init__(self, llm_initializer: LLMInitializer = None):
+    def __init__(self, config_path: str):
         """
         Initialize the GenEval framework
         
         Args:
-            llm_initializer: Optional LLMInitializer instance for LLM configuration
+            config_path: Path to LLM configuration file (required)
         """
         self.logger = logging.getLogger(__name__)
         self.logger.info("Initializing GenEvalFramework")
         
-        # Initialize adapters
-        self.adapters = {
-            "ragas": RAGASAdapter(llm_initializer),
-            "deepeval": DeepEvalAdapter(llm_initializer)
+        # Initialize LLM manager for configuration management
+        self.llm_manager = LLMManager(config_path=config_path)
+        self.llm_info = {
+            "provider": self.llm_manager.get_default_provider(),
+            "model": self.llm_manager.get_provider_config(self.llm_manager.get_default_provider()).get("model", "unknown")
         }
         
-        self.logger.info("GenEvalFramework initialized with adapters: %s", list(self.adapters.keys()))
+        # Initialize adapters (both get LLM manager for consistency)
+        try:
+            self.adapters = {
+                "ragas": RAGASAdapter(self.llm_manager),
+                "deepeval": DeepEvalAdapter(self.llm_manager)
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize adapters: {e}")
+        
+        self.logger.info(f"GenEvalFramework initialized with adapters: {list(self.adapters.keys())}")
+        if self.llm_info:
+            self.logger.info(f"Using LLM: {self.llm_info['provider']} - {self.llm_info['model']}")
 
     def evaluate(self, **kwargs) -> Dict:
         """

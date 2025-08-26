@@ -1,0 +1,60 @@
+# LLM Configuration for GenEval Framework
+# This file configures available LLM providers and their settings
+
+providers:
+  openai:
+    enabled: true
+    default: true  # This provider will be used by default
+    api_key_env: "OPENAI_API_KEY"
+    model: "gpt-4o"  
+
+  azure_openai:
+    enabled: false
+    default: false
+    model: "gpt-4.1"
+    deployment_name: "your-deployment-name"
+    azure_openai_api_key: "your-azure-openai-api-key"
+    openai_api_version: "2025-01-01-preview"
+    azure_endpoint: "https://your-resource.azure.openai.com/"
+
+  anthropic:
+    enabled: true
+    default: false
+    api_key_env: "ANTHROPIC_API_KEY"
+    model: "claude-3-5-haiku"
+    temperature: 0.1
+
+  amazon_bedrock:
+    enabled: false
+    default: false
+    model: "anthropic.claude-3-sonnet-20240229-v1:0"
+    region_name: "us-east-1"
+    temperature: 0.1
+
+  gemini:
+    enabled: true
+    default: false
+    api_key_env: "GOOGLE_API_KEY"
+    model: "gemini-1.5-pro"
+    temperature: 0.1
+
+  deepseek:
+    enabled: false
+    default: false
+    api_key_env: "DEEPSEEK_API_KEY"
+    model: "deepseek-chat"
+    temperature: 0.1
+
+  ollama:
+    enabled: true
+    default: false
+    base_url: "http://localhost:11434"  # Default Ollama server URL
+    model: "llama3.2"
+    temperature: 0.1
+
+# Global settings
+settings:
+  timeout: 30  # Request timeout in seconds
+  max_retries: 3  # Maximum retry attempts
+  temperature: 0.1  # Default temperature for evaluations
+  max_tokens: 1000  # Default max tokens for responses 
