@@ -11,7 +11,7 @@ Key benefits:
 - Consistent output format across all frameworks
 - Support for 9 unique evaluation metrics
 - Clean JSON output for easy integration
-- config-driven LLM management supporting OpenAI, Anthropic, Google Gemini, and Ollama
+- config-driven LLM management supporting OpenAI, Anthropic, Google Gemini, Ollama, DeepSeek, Amazon Bedrock, Azure OpenAI, and vLLM
 
 ## Supported Metrics
 
@@ -49,6 +49,15 @@ uv sync
 export OPENAI_API_KEY="your-openai-api-key"
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
 export GOOGLE_API_KEY="your-google-api-key"
+export DEEPSEEK_API_KEY="your-deepseek-api-key"
+
+# For vLLM servers
+export VLLM_BASE_URL="https://your-vllm-server.com"
+export VLLM_API_PATH="/v1"
+
+# For AWS Bedrock (optional)
+export AWS_ACCESS_KEY_ID="your-aws-access-key"
+export AWS_SECRET_ACCESS_KEY="your-aws-secret-key"
 
 # Create your LLM configuration file
 # You'll need to specify the path to this file when using the framework
@@ -85,6 +94,36 @@ providers:
     default: false
     base_url: "http://localhost:11434"
     model: "llama3.2"
+  
+  deepseek:
+    enabled: true
+    default: false
+    api_key_env: "DEEPSEEK_API_KEY"
+    model: "deepseek-chat"
+  
+  vllm:
+    enabled: true
+    default: false
+    base_url_env: "VLLM_BASE_URL"
+    api_path_env: "VLLM_API_PATH"
+    api_key_env: "OPENAI_API_KEY"  # If authentication required
+    model: "your-model-name"
+    ssl_verify: false
+  
+  amazon_bedrock:
+    enabled: true
+    default: false
+    model: "anthropic.claude-3-sonnet-20240229-v1:0"
+    region_name: "us-east-1"
+  
+  azure_openai:
+    enabled: true
+    default: false
+    model: "gpt-4"
+    deployment_name: "your-deployment-name"
+    azure_openai_api_key: "your-azure-openai-api-key"
+    openai_api_version: "2025-01-01-preview"
+    azure_endpoint: "https://your-resource.openai.azure.com/"
 
 settings:
   temperature: 0.1

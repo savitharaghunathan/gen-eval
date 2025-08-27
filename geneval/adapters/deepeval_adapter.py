@@ -1,7 +1,9 @@
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from deepeval import evaluate
-from deepeval.models import GPTModel, AzureOpenAIModel, AnthropicModel, AmazonBedrockModel, GeminiModel, DeepSeekModel, OllamaModel
+from deepeval.models import GPTModel, AzureOpenAIModel, AnthropicModel, AmazonBedrockModel, GeminiModel, DeepSeekModel, OllamaModel, DeepEvalBaseLLM
+import httpx
+import asyncio
 from deepeval.metrics import (
     AnswerRelevancyMetric,
     ContextualRelevancyMetric,
@@ -15,9 +17,125 @@ from geneval.schemas import Input, MetricResult, Output
 from geneval.llm_manager import LLMManager
 
 
+class VLLMModel(DeepEvalBaseLLM):
+    """Custom vLLM model for DeepEval that supports any model via OpenAI-compatible API"""
+    
+    def __init__(self, base_url: str, model_name: str, api_path: str = "/v1", 
+                 api_key: str = "dummy-key", temperature: float = 0.1, ssl_verify: bool = True):
+        self.base_url = base_url
+        self.model_name = model_name
+        self.api_path = api_path
+        self.api_key = api_key
+        self.temperature = temperature
+        self.ssl_verify = ssl_verify
+        
+        # Create HTTP clients for both sync and async operations
+        timeout = httpx.Timeout(30.0)
+        
+        self.sync_client = httpx.Client(
+            verify=self.ssl_verify,
+            timeout=timeout
+        )
+        
+        self.async_client = httpx.AsyncClient(
+            verify=self.ssl_verify,
+            timeout=timeout
+        )
+        
+    def get_model_name(self) -> str:
+        return self.model_name
+        
+    def load_model(self):
+        # No local model to load; interactions are via API
+        pass
+        
+    def generate(self, prompt: str) -> str:
+        """Generate text using vLLM's OpenAI-compatible API"""
+        headers = {
+            "Content-Type": "application/json",
+        }
+        if self.api_key and self.api_key != "dummy-key":
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            
+        payload = {
+            "model": self.model_name,
+            "messages": [{"role": "user", "content": prompt}],  # Chat format
+            "temperature": self.temperature
+        }
+        
+        try:
+            # Use httpx
+            endpoint_url = f"{self.base_url}{self.api_path}/chat/completions"
+            
+            response = self.sync_client.post(
+                endpoint_url,
+                json=payload,
+                headers=headers
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
+            
+        except httpx.HTTPStatusError as e:
+            raise RuntimeError(f"HTTP error calling vLLM API: {e.response.status_code} - {e.response.text}")
+        except httpx.ConnectError as e:
+            raise RuntimeError(f"Connection error connecting to vLLM server: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Error calling vLLM API: {e}")
+    
+    async def a_generate(self, prompt: str) -> str:
+        """Async version of generate using httpx async client"""
+        headers = {
+            "Content-Type": "application/json",
+        }
+        if self.api_key and self.api_key != "dummy-key":
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            
+        payload = {
+            "model": self.model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": self.temperature
+        }
+        
+        try:
+            endpoint_url = f"{self.base_url}{self.api_path}/chat/completions"
+            
+            response = await self.async_client.post(
+                endpoint_url,
+                json=payload,
+                headers=headers
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
+            
+        except httpx.HTTPStatusError as e:
+            raise RuntimeError(f"HTTP error calling vLLM API: {e.response.status_code} - {e.response.text}")
+        except httpx.ConnectError as e:
+            raise RuntimeError(f"Connection error connecting to vLLM server: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Error calling vLLM API: {e}")
+    
+    def __del__(self):
+        """Clean up HTTP clients"""
+        if hasattr(self, 'sync_client'):
+            self.sync_client.close()
+        if hasattr(self, 'async_client'):
+            # For async client cleanup in destructor, we need to handle it carefully
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, schedule the cleanup
+                    loop.create_task(self.async_client.aclose())
+                else:
+                    # If no loop is running, run it synchronously
+                    asyncio.run(self.async_client.aclose())
+            except:
+                # If there are issues with cleanup, just pass
+                pass
+
 class DeepEvalAdapter:
     """
-    Adapter for DeepEval metrics using GPTModel for OpenAI integration
+    Adapter for DeepEval metrics with support for multiple LLM providers
     """
 
     def __init__(self, llm_manager: LLMManager):
@@ -50,19 +168,19 @@ class DeepEvalAdapter:
         
         self.logger.info(f"LLM configured with provider: {self.llm_info.get('provider', 'unknown')}")
 
-        # Initialize GPTModel for DeepEval
-        self.gpt_model = self._create_gpt_model()
+        # Initialize model for DeepEval
+        self.model = self._create_model()
         
-        # Initialize metrics with GPTModel configuration
+        # Initialize metrics
         try:
             self.available_metrics = {
-                "answer_relevancy": AnswerRelevancyMetric(model=self.gpt_model),
-                "context_relevance": ContextualRelevancyMetric(model=self.gpt_model),
-                "faithfulness": FaithfulnessMetric(model=self.gpt_model),
-                "context_recall": ContextualRecallMetric(model=self.gpt_model),
-                "context_precision": ContextualPrecisionMetric(model=self.gpt_model),
+                "answer_relevancy": AnswerRelevancyMetric(model=self.model),
+                "context_relevance": ContextualRelevancyMetric(model=self.model),
+                "faithfulness": FaithfulnessMetric(model=self.model),
+                "context_recall": ContextualRecallMetric(model=self.model),
+                "context_precision": ContextualPrecisionMetric(model=self.model),
             }
-            self.logger.info(f"DeepEval metrics initialized successfully with {len(self.available_metrics)} metrics using GPTModel")
+            self.logger.info(f"DeepEval metrics initialized successfully with {len(self.available_metrics)} metrics")
         except Exception as e:
             self.logger.error(f"Failed to initialize DeepEval metrics: {e}")
             raise RuntimeError(f"Failed to initialize DeepEval metrics: {e}")
@@ -70,16 +188,31 @@ class DeepEvalAdapter:
         # Set supported metrics based on available metrics
         self.supported_metrics = list(self.available_metrics.keys())
 
-    def _create_gpt_model(self):
-        """
-        Create DeepEval model instance based on LLM configuration
-        """
+    def _create_model(self):
+        """Create DeepEval model instance based on LLM configuration"""
         provider = self.llm_info.get('provider')
         
         # Get DeepEval-compatible configuration from LLM manager
         deepeval_config = self.llm_manager.get_deepeval_config(provider)
         
-        if provider == "openai":
+        if provider == "vllm":
+            if not deepeval_config.get("model"):
+                raise ValueError("vLLM model not specified in configuration")
+            
+            # Create custom VLLMModel
+            vllm_model = VLLMModel(
+                base_url=deepeval_config.get("base_url", "http://localhost:8000"),
+                model_name=deepeval_config["model"],
+                api_path=deepeval_config.get("api_path", "/v1"),
+                api_key=deepeval_config.get("api_key", "dummy-key"),
+                temperature=deepeval_config["temperature"],
+                ssl_verify=deepeval_config.get("ssl_verify", True)
+            )
+            
+            self.logger.info(f"Created custom vLLM model: {deepeval_config['model']}, endpoint: {deepeval_config.get('base_url')}{deepeval_config.get('api_path', '/v1')}")
+            return vllm_model
+        
+        elif provider == "openai":
             # Use the model from config - no fallback to hardcoded values
             if not deepeval_config.get("model"):
                 raise ValueError("OpenAI model not specified in configuration. Please set a model in your llm_config.yaml")
@@ -205,7 +338,7 @@ class DeepEvalAdapter:
             
         else:
             # For other providers, raise an error
-            raise ValueError(f"Provider {provider} not fully supported for DeepEval. Only OpenAI, Azure OpenAI, Anthropic, Amazon Bedrock, Gemini, DeepSeek, and Ollama providers are currently supported.")
+            raise ValueError(f"Provider {provider} not fully supported for DeepEval. Only OpenAI, Azure OpenAI, Anthropic, Amazon Bedrock, Gemini, DeepSeek, Ollama and VLLM providers are currently supported.")
 
     def _create_test_case(self, input: Input) -> LLMTestCase:
         """

@@ -4,7 +4,7 @@
 providers:
   openai:
     enabled: true
-    default: true  # This provider will be used by default
+    default: false  # This provider will be used by default
     api_key_env: "OPENAI_API_KEY"
     model: "gpt-4o"  
 
@@ -35,7 +35,7 @@ providers:
     enabled: true
     default: false
     api_key_env: "GOOGLE_API_KEY"
-    model: "gemini-1.5-pro"
+    model: "gemini-2.0-flash"
     temperature: 0.1
 
   deepseek:
@@ -50,6 +50,16 @@ providers:
     default: false
     base_url: "http://localhost:11434"  # Default Ollama server URL
     model: "llama3.2"
+    temperature: 0.1
+
+  vllm:
+    enabled: true
+    default: true
+    base_url_env: "VLLM_BASE_URL"
+    model: "gemini-2.0-flash"
+    api_path_env: "VLLM_API_PATH"
+    api_key_env: "OPENAI_API_KEY"  # If your vLLM server requires authentication
+    ssl_verify: false
     temperature: 0.1
 
 # Global settings
