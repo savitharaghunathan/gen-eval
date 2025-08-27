@@ -4,7 +4,7 @@
 providers:
   openai:
     enabled: true
-    default: false  # This provider will be used by default
+    default: true  # This provider will be used by default
     api_key_env: "OPENAI_API_KEY"
     model: "gpt-4o"  
 
@@ -54,7 +54,7 @@ providers:
 
   vllm:
     enabled: true
-    default: true
+    default: false
     base_url_env: "VLLM_BASE_URL"
     model: "gemini-2.0-flash"
     api_path_env: "VLLM_API_PATH"
