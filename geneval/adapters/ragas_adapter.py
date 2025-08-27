@@ -1,5 +1,6 @@
 import logging
 import os
+import httpx
 from typing import List, Dict, Any, Optional
 from ragas.metrics import (
     LLMContextPrecisionWithoutReference,
@@ -105,6 +106,8 @@ class RAGASAdapter:
                 langchain_llm = self._create_deepseek_provider(provider_name)
             elif provider_name == "ollama":
                 langchain_llm = self._create_ollama_provider(provider_name)
+            elif provider_name == "vllm":
+                langchain_llm = self._create_vllm_provider(provider_name)
             else:
                 self.logger.warning(f"Unknown provider: {provider_name}")
                 return None
@@ -304,8 +307,74 @@ class RAGASAdapter:
             temperature=global_settings.get("temperature", 0.1)
         )
 
+    def _create_vllm_provider(self, provider_name: str) -> Optional[ChatOpenAI]:
+        """Create vLLM provider using OpenAI-compatible interface"""
+        try:
+            provider_config = self.llm_manager.get_provider_config(provider_name)
+            global_settings = self.llm_manager.get_global_settings()
+            
+            # Get configuration parameters
+            base_url = self.llm_manager.get_base_url(provider_name) or "http://localhost:8000"
+            model = provider_config.get("model")
+            ssl_verify = provider_config.get("ssl_verify", True)
+            api_path = self.llm_manager.get_api_path(provider_name) or "/v1"
+            
+            # Read API key from environment variable
+            api_key_env = provider_config.get("api_key_env")
+            api_key = "dummy-key"  # Default for vLLM when no auth is needed
+            
+            if api_key_env:
+                env_api_key = os.getenv(api_key_env)
+                if env_api_key:
+                    api_key = env_api_key
+                else:
+                    self.logger.warning(f"{api_key_env} not found in environment variables, using dummy key")
+            
+            # Also check for direct api_key in config as fallback
+            elif provider_config.get("api_key"):
+                api_key = provider_config.get("api_key")
+            
+            if not model:
+                raise ValueError("vLLM model not specified in configuration")
+            
+            # Create HTTP client with SSL settings
+            http_client_kwargs = {}
+            if not ssl_verify:
+                # Create custom HTTP client with SSL verification disabled
+                sync_http_client = httpx.Client(
+                verify=False,
+                timeout=global_settings.get("timeout", 30)
+                )
+                async_http_client = httpx.AsyncClient(
+                    verify=False,
+                    timeout=global_settings.get("timeout", 30)
+                )
+                
+                http_client_kwargs["http_client"] = sync_http_client
+                http_client_kwargs["http_async_client"] = async_http_client
+                
+                self.logger.warning(f"SSL verification disabled for vLLM provider: {base_url}")
 
-
+            # Construct the full endpoint URL
+            full_base_url = f"{base_url}{api_path}"
+            
+            # Create ChatOpenAI instance pointing to vLLM server
+            vllm_llm = ChatOpenAI(
+                model=model,
+                temperature=global_settings.get("temperature", 0.1),
+                max_tokens=global_settings.get("max_tokens", 1000),
+                timeout=global_settings.get("timeout", 30),
+                base_url=full_base_url,
+                api_key=api_key,
+                **http_client_kwargs
+            )
+            
+            self.logger.info(f"Created vLLM provider: {model} at {full_base_url} (SSL verify: {ssl_verify})")
+            return vllm_llm
+            
+        except Exception as e:
+            self.logger.error(f"Error creating vLLM provider: {e}")
+            return None
 
     def _prepare_dataset(self, input: Input) -> Dataset:
         """
