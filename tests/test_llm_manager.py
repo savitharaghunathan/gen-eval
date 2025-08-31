@@ -595,3 +595,69 @@ class TestLLMManager:
         
         deepeval_config = manager.get_deepeval_config("openai")
         assert deepeval_config["temperature"] == 0.1  # Default value
+    
+    @patch('geneval.llm_manager.LLMManager._load_config')
+    def test_get_base_url_from_env(self, mock_load_config):
+        """Test getting base URL from environment variable"""
+        mock_config = {
+            "providers": {
+                "vllm": {"enabled": True, "default": True, "base_url_env": "VLLM_BASE_URL"}
+            }
+        }
+        mock_load_config.return_value = mock_config
+        
+        with patch.dict(os.environ, {"VLLM_BASE_URL": "https://vllm-server.com"}):
+            manager = LLMManager(config_path="test_config.yaml")
+            
+            base_url = manager.get_base_url("vllm")
+            assert base_url == "https://vllm-server.com"
+    
+    @patch('geneval.llm_manager.LLMManager._load_config')
+    def test_get_api_path_from_env(self, mock_load_config):
+        """Test getting API path from environment variable"""
+        mock_config = {
+            "providers": {
+                "vllm": {"enabled": True, "default": True, "api_path_env": "VLLM_API_PATH"}
+            }
+        }
+        mock_load_config.return_value = mock_config
+        
+        with patch.dict(os.environ, {"VLLM_API_PATH": "/custom/api"}):
+            manager = LLMManager(config_path="test_config.yaml")
+            
+            api_path = manager.get_api_path("vllm")
+            assert api_path == "/custom/api"
+    
+    @patch('geneval.llm_manager.LLMManager._load_config')
+    def test_get_deepeval_config_vllm(self, mock_load_config):
+        """Test getting DeepEval config for vLLM"""
+        mock_config = {
+            "providers": {
+                "vllm": {
+                    "enabled": True, 
+                    "default": True, 
+                    "model": "gemini-2.0-flash",
+                    "base_url_env": "VLLM_BASE_URL",
+                    "api_path_env": "VLLM_API_PATH", 
+                    "api_key_env": "OPENAI_API_KEY",
+                    "ssl_verify": False
+                }
+            },
+            "settings": {"temperature": 0.1}
+        }
+        mock_load_config.return_value = mock_config
+        
+        with patch.dict(os.environ, {
+            "VLLM_BASE_URL": "https://vllm-server.com",
+            "VLLM_API_PATH": "/custom/api",
+            "OPENAI_API_KEY": "test-key"
+        }):
+            manager = LLMManager(config_path="test_config.yaml")
+            
+            deepeval_config = manager.get_deepeval_config("vllm")
+            assert deepeval_config["model"] == "gemini-2.0-flash"
+            assert deepeval_config["base_url"] == "https://vllm-server.com"
+            assert deepeval_config["api_path"] == "/custom/api"
+            assert deepeval_config["api_key"] == "test-key"
+            assert deepeval_config["ssl_verify"] is False
+            assert deepeval_config["temperature"] == 0.1

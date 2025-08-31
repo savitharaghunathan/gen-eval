@@ -538,6 +538,56 @@ class TestGenEvalFramework:
     @patch('geneval.framework.RAGASAdapter')
     @patch('geneval.framework.DeepEvalAdapter')
     @patch('geneval.framework.LLMManager')
+    def test_evaluate_with_vllm_provider(self, mock_llm_manager_class, mock_deepeval_adapter_class, mock_ragas_adapter_class):
+        """Test evaluation with vLLM provider"""
+        # Mock LLM manager with vLLM provider
+        mock_llm_manager = Mock(spec=LLMManager)
+        mock_llm_manager.get_default_provider.return_value = "vllm"
+        mock_llm_manager.get_provider_config.return_value = {"model": "gemini-2.0-flash"}
+        mock_llm_manager_class.return_value = mock_llm_manager
+        
+        # Mock adapters
+        mock_ragas_adapter = Mock(spec=RAGASAdapter)
+        mock_deepeval_adapter = Mock(spec=DeepEvalAdapter)
+        mock_ragas_adapter_class.return_value = mock_ragas_adapter
+        mock_deepeval_adapter_class.return_value = mock_deepeval_adapter
+        
+        # Mock supported metrics
+        mock_ragas_adapter.supported_metrics = ["faithfulness", "answer_relevancy"]
+        mock_deepeval_adapter.supported_metrics = ["faithfulness", "context_relevance"]
+        
+        # Mock evaluation results
+        mock_ragas_output = Mock(spec=Output)
+        mock_deepeval_output = Mock(spec=Output)
+        mock_ragas_adapter.evaluate.return_value = mock_ragas_output
+        mock_deepeval_adapter.evaluate.return_value = mock_deepeval_output
+        
+        framework = GenEvalFramework("test_config.yaml")
+        
+        # Verify framework initialization worked with vLLM
+        assert framework.llm_info["provider"] == "vllm"
+        assert framework.llm_info["model"] == "gemini-2.0-flash"
+        
+        results = framework.evaluate(
+            question="What is the capital of France?",
+            response="The capital of France is Paris.",
+            retrieval_context="Paris is the capital and largest city of France.",
+            reference="Paris is the capital of France.",
+            metrics=["faithfulness"]
+        )
+        
+        # Should work with both adapters
+        assert len(results) == 2
+        assert "ragas.faithfulness" in results
+        assert "deepeval.faithfulness" in results
+        
+        # Verify both adapters were called
+        mock_ragas_adapter.evaluate.assert_called_once()
+        mock_deepeval_adapter.evaluate.assert_called_once()
+    
+    @patch('geneval.framework.RAGASAdapter')
+    @patch('geneval.framework.DeepEvalAdapter')
+    @patch('geneval.framework.LLMManager')
     def test_evaluate_with_none_values(self, mock_llm_manager_class, mock_deepeval_adapter_class, mock_ragas_adapter_class):
         """Test evaluation with None values in input data"""
         # Mock LLM manager
