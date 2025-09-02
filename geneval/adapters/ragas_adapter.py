@@ -2,6 +2,7 @@ import logging
 import os
 import httpx
 from typing import List, Dict, Any, Optional
+from langchain_openai import OpenAIEmbeddings
 from ragas.metrics import (
     LLMContextPrecisionWithoutReference,
     LLMContextPrecisionWithReference,
@@ -69,16 +70,19 @@ class RAGASAdapter:
 
         # Initialize metrics with LLM configuration
         try:
+            # Create embeddings wrapper for metrics that need it
+            ragas_embeddings = self._create_ragas_embeddings_wrapper()
+            
             # For LLM-dependent metrics, we need to pass the LLM instance
             # RAGAS expects LLM instances to have certain methods
             self.available_metrics = {
                 "context_precision_without_reference": LLMContextPrecisionWithoutReference(llm=self.llm),
                 "context_precision_with_reference": LLMContextPrecisionWithReference(llm=self.llm),
                 "context_recall": LLMContextRecall(llm=self.llm),
-                "context_entity_recall": ContextEntityRecall(),
-                "noise_sensitivity": NoiseSensitivity(),
-                "answer_relevancy": AnswerRelevancy(),
-                "faithfulness": Faithfulness()
+                "context_entity_recall": ContextEntityRecall(llm=self.llm),
+                "noise_sensitivity": NoiseSensitivity(llm=self.llm),
+                "answer_relevancy": AnswerRelevancy(llm=self.llm, embeddings=ragas_embeddings) if ragas_embeddings else AnswerRelevancy(llm=self.llm),
+                "faithfulness": Faithfulness(llm=self.llm)
             }
             self.logger.info(f"RAGAS metrics initialized successfully with {len(self.available_metrics)} metrics")
         except Exception as e:
@@ -376,6 +380,75 @@ class RAGASAdapter:
             self.logger.error(f"Error creating vLLM provider: {e}")
             return None
 
+    def _create_ragas_embeddings_wrapper(self):
+        """
+        Create a RAGAS-compatible embeddings wrapper for metrics that require embeddings
+        This supports custom OpenAI-compatible embedding endpoints for non-OpenAI models
+        """
+        try:
+            # Check for embedding-specific environment variables
+            # These can be different from the main LLM configuration
+            embedding_api_key = os.getenv("OPENAI_EMBEDDING_API_KEY")
+            embedding_base_url = os.getenv("OPENAI_EMBEDDING_BASE_URL")
+            embedding_model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002")
+            
+            # If no embedding-specific config, try to use the main OpenAI config
+            if not embedding_api_key:
+                # Check if we have OpenAI as a configured provider
+                openai_config = self.llm_manager.get_provider_config("openai")
+                if openai_config:
+                    api_key_env = openai_config.get("api_key_env", "OPENAI_API_KEY")
+                    embedding_api_key = os.getenv(api_key_env)
+                    if not embedding_base_url:
+                        # Use the same base URL as the main OpenAI config if available
+                        embedding_base_url = openai_config.get("base_url")
+            
+            if not embedding_api_key:
+                self.logger.warning("No embedding API key found. Answer relevancy may not work optimally.")
+                return None
+            
+            # Configure embeddings parameters
+            embeddings_kwargs = {
+                "model": embedding_model,
+                "openai_api_key": embedding_api_key
+            }
+            
+            # Set custom base URL if provided
+            if embedding_base_url and embedding_base_url != "https://api.openai.com/v1":
+                embeddings_kwargs["openai_api_base"] = embedding_base_url
+                self.logger.info(f"Using custom embeddings base URL: {embedding_base_url}")
+            
+            # Handle SSL ignore setting
+            openai_ignore_ssl = os.getenv("OPENAI_IGNORE_SSL", "false").lower() == "true"
+            if openai_ignore_ssl:
+                try:
+                    # Create HTTP clients with SSL verification disabled
+                    sync_http_client = httpx.Client(verify=False, timeout=30)
+                    async_http_client = httpx.AsyncClient(verify=False, timeout=30)
+                    
+                    embeddings_kwargs["http_client"] = sync_http_client
+                    embeddings_kwargs["http_async_client"] = async_http_client
+                    
+                    self.logger.info("Created RAGAS embeddings wrapper with SSL verification disabled")
+                except Exception as ssl_error:
+                    self.logger.warning(f"Failed to configure SSL ignore for embeddings: {ssl_error}")
+            else:
+                self.logger.info("Created RAGAS embeddings wrapper with standard SSL")
+            
+            # Create LangChain embeddings wrapper with configuration
+            embeddings = OpenAIEmbeddings(**embeddings_kwargs)
+            
+            self.logger.info(f"Embeddings configured successfully with model: {embedding_model}")
+            if embedding_base_url:
+                self.logger.info(f"Using custom endpoint: {embedding_base_url}")
+            
+            return embeddings
+                
+        except Exception as e:
+            self.logger.error(f"Failed to create RAGAS embeddings wrapper: {e}")
+            self.logger.warning("Answer relevancy metric will work with LLM only (may be less optimal)")
+            return None
+
     def _prepare_dataset(self, input: Input) -> Dataset:
         """
         Convert input to RAGAS-compatible dataset format
@@ -390,7 +463,10 @@ class RAGASAdapter:
             "contexts": [contexts],
             "answer": [input.response],
             "ground_truths": [[input.reference]],
-            "reference": [input.reference]
+            "reference": [input.reference],
+            # AnswerRelevancy specific columns
+            "user_input": [input.question],
+            "response": [input.response],
         }
         self.logger.info(f"Dataset prepared with context")
         return Dataset.from_dict(data)
@@ -429,7 +505,10 @@ class RAGASAdapter:
                     "contexts": "contexts",
                     "answer": "answer",
                     "ground_truths": "ground_truths",
-                    "reference": "reference"
+                    "reference": "reference",
+                    # AnswerRelevancy specific mappings  
+                    "user_input": "user_input",
+                    "response": "response",
                 }
             )
             
