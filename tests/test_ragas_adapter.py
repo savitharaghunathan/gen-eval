@@ -253,6 +253,91 @@ class TestRAGASAdapter:
     @patch('geneval.adapters.ragas_adapter.LLMManager')
     @patch('geneval.adapters.ragas_adapter.LangchainLLMWrapper')
     @patch('geneval.adapters.ragas_adapter.ChatOpenAI')
+    def test_create_vllm_provider_success(self, mock_chat_openai, mock_langchain_wrapper, mock_llm_manager_class):
+        """Test successful vLLM provider creation"""
+        mock_llm_manager = Mock(spec=LLMManager)
+        mock_llm_manager.get_default_provider.return_value = "vllm"
+        mock_llm_manager.get_provider_config.return_value = {
+            "model": "gemini-2.0-flash",
+            "api_key_env": "OPENAI_API_KEY",
+            "ssl_verify": True
+        }
+        mock_llm_manager.get_global_settings.return_value = {"temperature": 0.1, "max_tokens": 1000, "timeout": 30}
+        mock_llm_manager.get_base_url.return_value = "https://vllm-server.com"
+        mock_llm_manager.get_api_path.return_value = "/v1"
+        
+        mock_vllm_llm = Mock()
+        mock_chat_openai.return_value = mock_vllm_llm
+        
+        mock_wrapped_llm = Mock()
+        mock_langchain_wrapper.return_value = mock_wrapped_llm
+        
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+            adapter = RAGASAdapter(mock_llm_manager)
+            
+            mock_chat_openai.assert_called_once_with(
+                model="gemini-2.0-flash",
+                temperature=0.1,
+                max_tokens=1000,
+                timeout=30,
+                base_url="https://vllm-server.com/v1",
+                api_key="test-key"
+            )
+    
+    @patch('geneval.adapters.ragas_adapter.LLMManager')
+    @patch('geneval.adapters.ragas_adapter.LangchainLLMWrapper') 
+    @patch('geneval.adapters.ragas_adapter.ChatOpenAI')
+    def test_create_vllm_provider_ssl_disabled(self, mock_chat_openai, mock_langchain_wrapper, mock_llm_manager_class):
+        """Test vLLM provider creation with SSL verification disabled"""
+        mock_llm_manager = Mock(spec=LLMManager)
+        mock_llm_manager.get_default_provider.return_value = "vllm"
+        mock_llm_manager.get_provider_config.return_value = {
+            "model": "gemini-2.0-flash",
+            "ssl_verify": False
+        }
+        mock_llm_manager.get_global_settings.return_value = {"temperature": 0.1, "timeout": 30}
+        mock_llm_manager.get_base_url.return_value = "https://vllm-server.com"
+        mock_llm_manager.get_api_path.return_value = "/custom"
+        
+        mock_vllm_llm = Mock()
+        mock_chat_openai.return_value = mock_vllm_llm
+        
+        mock_wrapped_llm = Mock()
+        mock_langchain_wrapper.return_value = mock_wrapped_llm
+        
+        # Mock httpx clients
+        with patch('geneval.adapters.ragas_adapter.httpx.Client') as mock_sync_client, \
+             patch('geneval.adapters.ragas_adapter.httpx.AsyncClient') as mock_async_client:
+            
+            adapter = RAGASAdapter(mock_llm_manager)
+            
+            # Verify httpx clients were created with SSL verification disabled
+            mock_sync_client.assert_called_once()
+            sync_call_kwargs = mock_sync_client.call_args[1]
+            assert sync_call_kwargs['verify'] is False
+            
+            mock_async_client.assert_called_once()
+            async_call_kwargs = mock_async_client.call_args[1]
+            assert async_call_kwargs['verify'] is False
+    
+    @patch('geneval.adapters.ragas_adapter.LLMManager')
+    @patch('geneval.adapters.ragas_adapter.LangchainLLMWrapper')
+    @patch('geneval.adapters.ragas_adapter.ChatOpenAI')
+    def test_create_vllm_provider_missing_model(self, mock_chat_openai, mock_langchain_wrapper, mock_llm_manager_class):
+        """Test vLLM provider creation with missing model"""
+        mock_llm_manager = Mock(spec=LLMManager)
+        mock_llm_manager.get_default_provider.return_value = "vllm"
+        mock_llm_manager.get_provider_config.return_value = {}  # No model
+        mock_llm_manager.get_global_settings.return_value = {"temperature": 0.1}
+        mock_llm_manager.get_base_url.return_value = "https://vllm-server.com"
+        mock_llm_manager.get_api_path.return_value = "/v1"
+        
+        with pytest.raises(ValueError, match="No LLM available"):
+            RAGASAdapter(mock_llm_manager)
+    
+    @patch('geneval.adapters.ragas_adapter.LLMManager')
+    @patch('geneval.adapters.ragas_adapter.LangchainLLMWrapper')
+    @patch('geneval.adapters.ragas_adapter.ChatOpenAI')
     def test_prepare_dataset(self, mock_chat_openai, mock_langchain_wrapper, mock_llm_manager_class):
         """Test dataset preparation"""
         mock_llm_manager = Mock(spec=LLMManager)

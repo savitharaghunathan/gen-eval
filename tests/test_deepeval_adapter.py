@@ -59,7 +59,7 @@ class TestDeepEvalAdapter:
         assert adapter.llm_info["model"] == "gpt-4o-mini"
         assert len(adapter.supported_metrics) > 0
         assert "faithfulness" in adapter.supported_metrics
-        assert adapter.gpt_model == mock_model
+        assert adapter.model == mock_model
     
     @patch('geneval.adapters.deepeval_adapter.AzureOpenAIModel')
     def test_initialization_success_azure_openai(self, mock_azure_model):
@@ -86,7 +86,7 @@ class TestDeepEvalAdapter:
         
         assert adapter.llm_info["provider"] == "azure_openai"
         assert adapter.llm_info["model"] == "gpt-4"
-        assert adapter.gpt_model == mock_model
+        assert adapter.model == mock_model
     
     @patch('geneval.adapters.deepeval_adapter.AnthropicModel')
     def test_initialization_success_anthropic(self, mock_anthropic_model):
@@ -109,7 +109,7 @@ class TestDeepEvalAdapter:
         
         assert adapter.llm_info["provider"] == "anthropic"
         assert adapter.llm_info["model"] == "claude-3-5-haiku"
-        assert adapter.gpt_model == mock_model
+        assert adapter.model == mock_model
     
     @patch('geneval.adapters.deepeval_adapter.AmazonBedrockModel')
     def test_initialization_success_amazon_bedrock(self, mock_bedrock_model):
@@ -132,7 +132,7 @@ class TestDeepEvalAdapter:
         
         assert adapter.llm_info["provider"] == "amazon_bedrock"
         assert adapter.llm_info["model"] == "anthropic.claude-3-sonnet-20240229-v1:0"
-        assert adapter.gpt_model == mock_model
+        assert adapter.model == mock_model
     
     @patch('geneval.adapters.deepeval_adapter.GeminiModel')
     def test_initialization_success_gemini(self, mock_gemini_model):
@@ -156,7 +156,7 @@ class TestDeepEvalAdapter:
         
         assert adapter.llm_info["provider"] == "gemini"
         assert adapter.llm_info["model"] == "gemini-1.5-flash"
-        assert adapter.gpt_model == mock_model
+        assert adapter.model == mock_model
     
     @patch('geneval.adapters.deepeval_adapter.DeepSeekModel')
     def test_initialization_success_deepseek(self, mock_deepseek_model):
@@ -180,7 +180,7 @@ class TestDeepEvalAdapter:
         
         assert adapter.llm_info["provider"] == "deepseek"
         assert adapter.llm_info["model"] == "deepseek-chat"
-        assert adapter.gpt_model == mock_model
+        assert adapter.model == mock_model
     
     @patch('geneval.adapters.deepeval_adapter.OllamaModel')
     def test_initialization_success_ollama(self, mock_ollama_model):
@@ -204,7 +204,7 @@ class TestDeepEvalAdapter:
         
         assert adapter.llm_info["provider"] == "ollama"
         assert adapter.llm_info["model"] == "llama3.2"
-        assert adapter.gpt_model == mock_model
+        assert adapter.model == mock_model
     
     @patch('geneval.adapters.deepeval_adapter.OllamaModel')
     def test_initialization_success_ollama_default_url(self, mock_ollama_model):
@@ -228,7 +228,34 @@ class TestDeepEvalAdapter:
         
         assert adapter.llm_info["provider"] == "ollama"
         assert adapter.llm_info["model"] == "llama3.2"
-        assert adapter.gpt_model == mock_model
+        assert adapter.model == mock_model
+    
+    @patch('geneval.adapters.deepeval_adapter.VLLMModel')
+    def test_initialization_success_vllm(self, mock_vllm_model):
+        """Test successful DeepEvalAdapter initialization with vLLM"""
+        # Mock LLM manager
+        mock_llm_manager = Mock(spec=LLMManager)
+        mock_llm_manager.get_default_provider.return_value = "vllm"
+        mock_llm_manager.get_provider_config.return_value = {"model": "gemini-2.0-flash"}
+        mock_llm_manager.get_global_settings.return_value = {"temperature": 0.1}
+        mock_llm_manager.get_deepeval_config.return_value = {
+            "model": "gemini-2.0-flash",
+            "temperature": 0.1,
+            "base_url": "https://vllm-server.com",
+            "api_path": "/v1",
+            "api_key": "test-key",
+            "ssl_verify": False
+        }
+        
+        # Mock VLLMModel
+        mock_model = Mock()
+        mock_vllm_model.return_value = mock_model
+        
+        adapter = DeepEvalAdapter(mock_llm_manager)
+        
+        assert adapter.llm_info["provider"] == "vllm"
+        assert adapter.llm_info["model"] == "gemini-2.0-flash"
+        assert adapter.model == mock_model
     
     def test_initialization_missing_llm_manager(self):
         """Test DeepEvalAdapter initialization with missing LLM manager"""
@@ -469,6 +496,82 @@ class TestDeepEvalAdapter:
         with pytest.raises(ValueError, match="Ollama model not specified in configuration"):
             DeepEvalAdapter(mock_llm_manager)
     
+    @patch('geneval.adapters.deepeval_adapter.VLLMModel')
+    def test_create_gpt_model_vllm_missing_model(self, mock_vllm_model):
+        """Test vLLM model creation with missing model"""
+        mock_llm_manager = Mock(spec=LLMManager)
+        mock_llm_manager.get_default_provider.return_value = "vllm"
+        mock_llm_manager.get_provider_config.return_value = {"model": "gemini-2.0-flash"}
+        mock_llm_manager.get_global_settings.return_value = {"temperature": 0.1}
+        mock_llm_manager.get_deepeval_config.return_value = {
+            "temperature": 0.1
+            # Missing model
+        }
+        
+        with pytest.raises(ValueError, match="vLLM model not specified in configuration"):
+            DeepEvalAdapter(mock_llm_manager)
+    
+    @patch('geneval.adapters.deepeval_adapter.VLLMModel')
+    def test_create_gpt_model_vllm_default_values(self, mock_vllm_model):
+        """Test vLLM model creation with default values"""
+        mock_llm_manager = Mock(spec=LLMManager)
+        mock_llm_manager.get_default_provider.return_value = "vllm"
+        mock_llm_manager.get_provider_config.return_value = {"model": "gemini-2.0-flash"}
+        mock_llm_manager.get_global_settings.return_value = {"temperature": 0.1}
+        mock_llm_manager.get_deepeval_config.return_value = {
+            "model": "gemini-2.0-flash",
+            "temperature": 0.1
+            # No base_url, api_path, api_key, ssl_verify - should use defaults
+        }
+        
+        # Mock VLLMModel
+        mock_model = Mock()
+        mock_vllm_model.return_value = mock_model
+        
+        adapter = DeepEvalAdapter(mock_llm_manager)
+        
+        # Verify VLLMModel was called with default values
+        mock_vllm_model.assert_called_once_with(
+            base_url="http://localhost:8000",  # Default value
+            model_name="gemini-2.0-flash",
+            api_path="/v1",  # Default value
+            api_key="dummy-key",  # Default value
+            temperature=0.1,
+            ssl_verify=True  # Default value
+        )
+    
+    @patch('geneval.adapters.deepeval_adapter.VLLMModel')
+    def test_create_gpt_model_vllm_custom_values(self, mock_vllm_model):
+        """Test vLLM model creation with custom values"""
+        mock_llm_manager = Mock(spec=LLMManager)
+        mock_llm_manager.get_default_provider.return_value = "vllm"
+        mock_llm_manager.get_provider_config.return_value = {"model": "gemini-2.0-flash"}
+        mock_llm_manager.get_global_settings.return_value = {"temperature": 0.1}
+        mock_llm_manager.get_deepeval_config.return_value = {
+            "model": "gemini-2.0-flash",
+            "temperature": 0.1,
+            "base_url": "https://custom-vllm-server.com",
+            "api_path": "/custom/api",
+            "api_key": "custom-api-key",
+            "ssl_verify": False
+        }
+        
+        # Mock VLLMModel
+        mock_model = Mock()
+        mock_vllm_model.return_value = mock_model
+        
+        adapter = DeepEvalAdapter(mock_llm_manager)
+        
+        # Verify VLLMModel was called with custom values
+        mock_vllm_model.assert_called_once_with(
+            base_url="https://custom-vllm-server.com",
+            model_name="gemini-2.0-flash",
+            api_path="/custom/api",
+            api_key="custom-api-key",
+            temperature=0.1,
+            ssl_verify=False
+        )
+    
     def test_create_gpt_model_unknown_provider(self):
         """Test model creation with unknown provider"""
         mock_llm_manager = Mock(spec=LLMManager)
@@ -480,7 +583,7 @@ class TestDeepEvalAdapter:
             "temperature": 0.1
         }
         
-        with pytest.raises(ValueError, match="Provider unknown_provider not fully supported"):
+        with pytest.raises(ValueError, match="Provider unknown_provider not fully supported for DeepEval. Only OpenAI, Azure OpenAI, Anthropic, Amazon Bedrock, Gemini, DeepSeek, Ollama and VLLM providers are currently supported."):
             DeepEvalAdapter(mock_llm_manager)
     
     @patch('geneval.adapters.deepeval_adapter.GPTModel')

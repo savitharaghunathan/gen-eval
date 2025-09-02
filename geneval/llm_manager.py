@@ -110,6 +110,36 @@ class LLMManager:
         
         return None
     
+    def get_base_url(self, provider_name: str) -> Optional[str]:
+        """Get base URL for a provider from environment variables or config"""
+        provider_config = self.provider_configs.get(provider_name, {})
+        base_url_env = provider_config.get("base_url_env")
+        
+        if base_url_env:
+            env_value = os.getenv(base_url_env)
+            if env_value:
+                return env_value
+            else:
+                self.logger.warning(f"{base_url_env} not found in environment variables")
+        
+        # Fallback to config value
+        return provider_config.get("base_url")
+    
+    def get_api_path(self, provider_name: str) -> Optional[str]:
+        """Get API path for a provider from environment variables or config"""
+        provider_config = self.provider_configs.get(provider_name, {})
+        api_path_env = provider_config.get("api_path_env")
+        
+        if api_path_env:
+            env_value = os.getenv(api_path_env)
+            if env_value:
+                return env_value
+            else:
+                self.logger.warning(f"{api_path_env} not found in environment variables")
+        
+        # Fallback to config value
+        return provider_config.get("api_path")
+    
     def get_available_providers(self) -> List[str]:
         """Get list of configured providers"""
         return list(self.provider_configs.keys())
@@ -158,6 +188,13 @@ class LLMManager:
         elif provider_name == "ollama":
             deepeval_config.update({
                 "base_url": provider_config.get("base_url", "http://localhost:11434"),
+            })
+        elif provider_name == "vllm":
+            deepeval_config.update({
+                "base_url": self.get_base_url(provider_name) or "http://localhost:8000",
+                "api_path": self.get_api_path(provider_name) or "/v1",
+                "api_key": self.get_api_key(provider_name),
+                "ssl_verify": provider_config.get("ssl_verify", True),
             })
         
         return deepeval_config 
