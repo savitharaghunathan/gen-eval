@@ -1,1 +1,1 @@
-# Config package for GenEval framework 
+# Config package for GenEval framework

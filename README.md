@@ -37,6 +37,8 @@ GenEval supports 9 unique metrics across both frameworks:
 
 ## Installation
 
+### From Source
+
 ```bash
 # Clone the repository
 git clone https://github.com/savitharaghunathan/gen-eval.git
@@ -63,6 +65,20 @@ export AWS_SECRET_ACCESS_KEY="your-aws-secret-key"
 # You'll need to specify the path to this file when using the framework
 ```
 
+### Development Setup
+
+```bash
+# Install development dependencies
+uv sync --dev --all-extras
+
+# Install pre-commit hooks
+uv run pre-commit install
+
+# Run all checks
+make lint
+make test
+```
+
 ## Configuration
 
 GenEval requires you to specify the path to your LLM configuration file. **API keys are never hardcoded - they are read from environment variables for security.**
@@ -76,31 +92,31 @@ providers:
     default: true
     api_key_env: "OPENAI_API_KEY"
     model: "gpt-4o-mini"
-  
+
   anthropic:
     enabled: true
     default: false
     api_key_env: "ANTHROPIC_API_KEY"
     model: "claude-3-5-haiku-20241022"
-  
+
   gemini:
     enabled: true
     default: false
     api_key_env: "GOOGLE_API_KEY"
     model: "gemini-1.5-flash"
-  
+
   ollama:
     enabled: true
     default: false
     base_url: "http://localhost:11434"
     model: "llama3.2"
-  
+
   deepseek:
     enabled: true
     default: false
     api_key_env: "DEEPSEEK_API_KEY"
     model: "deepseek-chat"
-  
+
   vllm:
     enabled: true
     default: false
@@ -109,13 +125,13 @@ providers:
     api_key_env: "OPENAI_API_KEY"  # If authentication required
     model: "your-model-name"
     ssl_verify: false
-  
+
   amazon_bedrock:
     enabled: true
     default: false
     model: "anthropic.claude-3-sonnet-20240229-v1:0"
     region_name: "us-east-1"
-  
+
   azure_openai:
     enabled: true
     default: false
@@ -200,10 +216,16 @@ The demo allows you to:
 
 ```
 gen-eval/
-├── pyproject.toml
-├── README.md
+├── pyproject.toml              # Project configuration and dependencies
+├── README.md                   # This file
+├── Makefile                    # Development commands
+├── .pre-commit-config.yaml     # Pre-commit hooks configuration
 ├── config/
 │   └── llm_config.yaml        # LLM provider configuration
+├── .github/
+│   └── workflows/
+│       ├── ci.yml             # Continuous Integration workflow
+│       └── release.yml        # Release workflow
 ├── geneval/
 │   ├── __init__.py
 │   ├── schemas.py              # Pydantic models
@@ -214,15 +236,69 @@ gen-eval/
 │       ├── ragas_adapter.py    # RAGAS integration
 │       └── deepeval_adapter.py # DeepEval integration
 ├── tests/
-│   ├── test_framework.py       # Framework tests (14 tests)
-│   ├── test_ragas_adapter.py   # RAGAS adapter tests (47 tests)
-│   ├── test_deepeval_adapter.py # DeepEval adapter tests (34 tests)
-│   ├── test_llm_manager.py     # LLM manager tests (35 tests)
-│   ├── test_schemas.py         # Schema validation tests (17 tests)
+│   ├── test_framework.py       # Framework tests (15 tests)
+│   ├── test_ragas_adapter.py   # RAGAS adapter tests (48 tests)
+│   ├── test_deepeval_adapter.py # DeepEval adapter tests (35 tests)
+│   ├── test_llm_manager.py     # LLM manager tests (40 tests)
+│   ├── test_schemas.py         # Schema validation tests (15 tests)
 │   ├── test_data.yaml          # Test dataset
 │   └── test_data_clean.yaml    # Clean test dataset
 ├── demo_interactive.py         # Interactive demo
 └── uv.lock                     # Dependency lock file
+```
+
+## Development
+
+### Code Quality
+
+This project uses several tools to maintain code quality:
+
+- **Black** - Code formatting
+- **isort** - Import sorting
+- **Ruff** - Fast linting and import sorting
+- **pre-commit** - Git hooks for automated checks
+
+### Available Commands
+
+```bash
+# Install development dependencies
+make install
+
+# Install pre-commit hooks
+make dev
+
+# Run all checks
+make pre-commit
+
+# Run format and lint before pushing
+make pre-push
+
+# Format code
+make format
+
+# Run linting
+make lint
+
+# Run tests
+make test
+
+# Build the package
+make build
+
+# Clean up generated files
+make clean
+```
+
+### Pre-commit Hooks
+
+Pre-commit hooks automatically run code quality checks before each commit:
+
+```bash
+# Install hooks (one-time setup)
+make dev
+
+# Run hooks on all files
+make pre-commit
 ```
 
 ## Testing
@@ -230,7 +306,7 @@ gen-eval/
 ### Running Tests
 
 ```bash
-# Run all tests using uv 
+# Run all tests using uv
 uv run pytest tests/ -v
 
 # Run tests with coverage report
@@ -323,3 +399,49 @@ GenEval returns consistent JSON output with LLM provider information:
 }
 ```
 
+## Contributing
+
+We welcome contributions! Please follow these steps:
+
+### 1. Fork and Clone
+```bash
+git clone https://github.com/your-username/gen-eval.git
+cd gen-eval
+```
+
+### 2. Set up Development Environment
+```bash
+# Install dependencies
+make install
+
+# Install pre-commit hooks
+make dev
+
+# Run all checks
+make pre-commit
+```
+
+### 3. Make Changes
+- Create a feature branch: `git checkout -b feature/your-feature`
+- Make your changes
+- Add tests for new functionality
+- Ensure all tests pass: `make test`
+- Ensure code quality: `make lint`
+
+### 4. Submit Pull Request
+- Push your branch: `git push origin feature/your-feature`
+- Create a pull request on GitHub
+- The CI will automatically run tests and checks
+
+### Development Guidelines
+
+- **Code Style**: Follow Black formatting and isort import sorting
+- **Type Hints**: Use type hints for all function parameters and return values
+- **Testing**: Add tests for new features and bug fixes
+- **Documentation**: Update README and docstrings as needed
+- **Commits**: Use clear, descriptive commit messages
+
+## Support
+
+- **Issues**: Report bugs and request features on [GitHub Issues](https://github.com/savitharaghunathan/gen-eval/issues)
+- **Discussions**: Join the conversation on [GitHub Discussions](https://github.com/savitharaghunathan/gen-eval/discussions)

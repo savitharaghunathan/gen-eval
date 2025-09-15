@@ -5,6 +5,7 @@ GenEval - Unified RAG Evaluation Framework
 This is a library package designed to be imported, not run directly.
 """
 
+
 def main():
     print("GenEval - Unified RAG Evaluation Framework")
     print("=" * 50)
@@ -24,6 +25,7 @@ def main():
     print("      metrics=['faithfulness', 'answer_relevance']")
     print("  )")
     print()
+
 
 if __name__ == "__main__":
     main()

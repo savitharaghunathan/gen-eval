@@ -1,5 +1,7 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
-from typing import Any, Dict, List
+
 
 class Input(BaseModel):
     """
@@ -10,7 +12,8 @@ class Input(BaseModel):
     response: str = Field(..., description="The response from the model")
     retrieval_context: str = Field(..., description="Contents of documents or snippets used for RAG retrieval")
     reference: str = Field(..., description="The reference answer or ground truth")
-    metrics: List[str] = Field(..., description="List of metrics to evaluate the response")
+    metrics: list[str] = Field(..., description="List of metrics to evaluate the response")
+
 
 class MetricResult(BaseModel):
     """
@@ -28,5 +31,5 @@ class Output(BaseModel):
     Output of the GenEval framework.
     """
 
-    metrics: List[MetricResult] = Field(..., description="List of metric results")
-    metadata: Dict[str, Any] = Field(..., description="Metadata about the evaluation")
+    metrics: list[MetricResult] = Field(..., description="List of metric results")
+    metadata: dict[str, Any] = Field(..., description="Metadata about the evaluation")
