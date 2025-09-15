@@ -285,6 +285,9 @@ make test
 # Build the package
 make build
 
+# Run security checks
+make security
+
 # Clean up generated files
 make clean
 ```

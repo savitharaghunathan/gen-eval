@@ -1,4 +1,4 @@
-.PHONY: help install dev pre-commit pre-push test lint format build clean
+.PHONY: help install dev pre-commit pre-push test lint format build security clean
 
 help:  ## Show this help message
 	@echo 'Usage: make [target]'
@@ -37,6 +37,16 @@ format:  ## Format code
 
 build:  ## Build the package
 	uv build
+
+security:  ## Run security checks
+	@echo "Running security checks..."
+	@echo "1. Checking for known vulnerabilities with pip-audit..."
+	uv run pip-audit --desc --format=json --output=security-report.json || true
+	@echo "2. Checking for outdated packages..."
+	uv run pip list --outdated || true
+	@echo "3. Running bandit security linter..."
+	uv run bandit -r geneval/ -f json -o bandit-report.json || true
+	@echo "✅ Security checks completed!"
 
 clean:  ## Clean up generated files
 	rm -rf htmlcov/
