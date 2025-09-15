@@ -279,8 +279,11 @@ make format
 # Run linting
 make lint
 
-# Run tests
+# Run tests with coverage (local development)
 make test
+
+# Run tests without coverage (faster, for CI)
+make test-ci
 
 # Build the package
 make build

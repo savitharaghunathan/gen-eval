@@ -43,16 +43,8 @@ jobs:
       run: uv sync --dev --all-extras
 
     - name: Run tests
-      run: make test
+      run: make test-ci
 
-    - name: Upload coverage to Codecov
-      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
 
   lint:
     name: Lint and Format Check

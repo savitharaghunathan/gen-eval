@@ -1,4 +1,4 @@
-.PHONY: help install dev pre-commit pre-push test lint format build security clean
+.PHONY: help install dev pre-commit pre-push test test-ci lint format build security clean
 
 help:  ## Show this help message
 	@echo 'Usage: make [target]'
@@ -15,14 +15,17 @@ dev:  ## Install pre-commit hooks
 pre-commit:  ## Run pre-commit on all files
 	uv run pre-commit run --all-files
 
-pre-push:  ## Run clean, format and lint before pushing
+pre-push:  ## Run clean, format, lint and test before pushing
 	$(MAKE) clean
 	$(MAKE) format
 	$(MAKE) lint
-	$(MAKE) test
+	$(MAKE) test-ci
 
-test:  ## Run tests
-	uv run pytest tests/ -v --cov=geneval --cov-report=xml --cov-report=html
+test:  ## Run tests with coverage (for local development)
+	uv run pytest tests/ -v --cov=geneval --cov-report=term-missing --cov-report=xml --cov-report=html
+
+test-ci:  ## Run tests without coverage (for CI)
+	uv run pytest tests/ -v
 
 lint:  ## Run linters
 	uv run black --check --diff .
