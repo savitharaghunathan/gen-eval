@@ -6,7 +6,7 @@ providers:
     enabled: true
     default: true  # This provider will be used by default
     api_key_env: "OPENAI_API_KEY"
-    model: "gpt-4o"  
+    model: "gpt-4o"
 
   azure_openai:
     enabled: false
@@ -67,4 +67,4 @@ settings:
   timeout: 30  # Request timeout in seconds
   max_retries: 3  # Maximum retry attempts
   temperature: 0.1  # Default temperature for evaluations
-  max_tokens: 1000  # Default max tokens for responses 
+  max_tokens: 1000  # Default max tokens for responses

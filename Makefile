@@ -1,0 +1,60 @@
+.PHONY: help install dev pre-commit pre-push test test-ci lint format build security clean
+
+help:  ## Show this help message
+	@echo 'Usage: make [target]'
+	@echo ''
+	@echo 'Targets:'
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+install:  ## Install the package
+	uv sync --dev --all-extras
+
+dev:  ## Install pre-commit hooks
+	uv run pre-commit install
+
+pre-commit:  ## Run pre-commit on all files
+	uv run pre-commit run --all-files
+
+pre-push:  ## Run clean, format, lint and test before pushing
+	$(MAKE) clean
+	$(MAKE) format
+	$(MAKE) lint
+	$(MAKE) test-ci
+
+test:  ## Run tests with coverage (for local development)
+	uv run pytest tests/ -v --cov=geneval --cov-report=term-missing --cov-report=xml --cov-report=html
+
+test-ci:  ## Run tests without coverage (for CI)
+	uv run pytest tests/ -v
+
+lint:  ## Run linters
+	uv run black --check --diff .
+	uv run isort --check-only --diff .
+	uv run ruff check geneval/ tests/
+
+
+format:  ## Format code
+	uv run black .
+	uv run isort .
+	uv run ruff check --fix geneval/ tests/
+
+build:  ## Build the package
+	uv build
+
+security:  ## Run security checks
+	@echo "Running security checks..."
+	@echo "1. Checking for known vulnerabilities with pip-audit..."
+	uv run pip-audit --desc --format=json --output=security-report.json || true
+	@echo "2. Checking for outdated packages..."
+	uv run pip list --outdated || true
+	@echo "3. Running bandit security linter..."
+	uv run bandit -r geneval/ -f json -o bandit-report.json || true
+	@echo "✅ Security checks completed!"
+
+clean:  ## Clean up generated files
+	rm -rf htmlcov/
+	rm -rf .coverage
+	rm -rf .pytest_cache/
+	rm -rf build/
+	rm -rf dist/
+	rm -rf *.egg-info/

@@ -6,61 +6,61 @@ across different frameworks like RAGAS and DeepEval.
 """
 
 import logging
-from typing import Dict
-from geneval.adapters.ragas_adapter import RAGASAdapter
+
 from geneval.adapters.deepeval_adapter import DeepEvalAdapter
+from geneval.adapters.ragas_adapter import RAGASAdapter
 from geneval.llm_manager import LLMManager
-from geneval.schemas import Input, Output
+from geneval.schemas import Input
 
 
 class GenEvalFramework:
     """
     Main framework for evaluating LLMs using multiple evaluation frameworks
     """
-    
+
     def __init__(self, config_path: str):
         """
         Initialize the GenEval framework
-        
+
         Args:
             config_path: Path to LLM configuration file (required)
         """
         self.logger = logging.getLogger(__name__)
         self.logger.info("Initializing GenEvalFramework")
-        
+
         # Initialize LLM manager for configuration management
         self.llm_manager = LLMManager(config_path=config_path)
         self.llm_info = {
             "provider": self.llm_manager.get_default_provider(),
-            "model": self.llm_manager.get_provider_config(self.llm_manager.get_default_provider()).get("model", "unknown")
+            "model": self.llm_manager.get_provider_config(self.llm_manager.get_default_provider()).get("model", "unknown"),
         }
-        
+
         # Initialize adapters (both get LLM manager for consistency)
         try:
             self.adapters = {
                 "ragas": RAGASAdapter(self.llm_manager),
-                "deepeval": DeepEvalAdapter(self.llm_manager)
+                "deepeval": DeepEvalAdapter(self.llm_manager),
             }
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize adapters: {e}")
-        
+            raise RuntimeError(f"Failed to initialize adapters: {e}") from e
+
         self.logger.info(f"GenEvalFramework initialized with adapters: {list(self.adapters.keys())}")
         if self.llm_info:
             self.logger.info(f"Using LLM: {self.llm_info['provider']} - {self.llm_info['model']}")
 
-    def evaluate(self, **kwargs) -> Dict:
+    def evaluate(self, **kwargs) -> dict:
         """
         Evaluate the model's response using the appropriate adapter
-        
+
         Args:
             **kwargs: Arguments to create Input object (question, response, retrieval_context, reference, metrics)
-            
+
         Returns:
             Output: Evaluation results
         """
         data = Input(**kwargs)
         self.logger.info(f"Starting evaluation for metrics: {data.metrics}")
-        
+
         results = {}
 
         for metric_str in data.metrics:
@@ -71,14 +71,14 @@ class GenEvalFramework:
                     raise ValueError(f"Unknown adapter: {adapter_name}")
                 if metric_name not in adapter.supported_metrics:
                     raise ValueError(f"Adapter '{adapter_name}' does not support metric '{metric_name}'")
-                
+
                 # Create input with only this metric
                 single_metric_input = Input(
                     question=data.question,
                     response=data.response,
                     retrieval_context=data.retrieval_context,
                     reference=data.reference,
-                    metrics=[metric_name]
+                    metrics=[metric_name],
                 )
                 raw = adapter.evaluate(single_metric_input)
                 key = metric_str
@@ -86,25 +86,24 @@ class GenEvalFramework:
             else:
                 metric_name = metric_str
                 # all adapters supporting this metric
-                candidates = [name for name, ad in self.adapters.items()
-                              if metric_name in ad.supported_metrics]
+                candidates = [name for name, ad in self.adapters.items() if metric_name in ad.supported_metrics]
                 if not candidates:
                     raise ValueError(f"No adapter supports metric '{metric_name}'")
                 for adapter_name in candidates:
                     adapter = self.adapters[adapter_name]
-                    
+
                     # Create input with only this metric
                     single_metric_input = Input(
                         question=data.question,
                         response=data.response,
                         retrieval_context=data.retrieval_context,
                         reference=data.reference,
-                        metrics=[metric_name]
+                        metrics=[metric_name],
                     )
                     raw = adapter.evaluate(single_metric_input)
                     key = f"{adapter_name}.{metric_name}"
                     results[key] = (adapter_name, raw)
             self.logger.debug("Raw result %s: %s", metric_str, results[key][1])
-    
+
         self.logger.info(f"Evaluation completed with {len(results)} results")
         return results
