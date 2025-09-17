@@ -82,39 +82,6 @@ jobs:
     - name: Run linting
       run: make lint
 
-  pre-push:
-    name: Pre-push Check
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
-
-    - name: Install uv
-      uses: astral-sh/setup-uv@v3
-      with:
-        version: "latest"
-
-    - name: Cache dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/uv
-          .venv
-        key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-uv-
-
-    - name: Install dependencies
-      run: uv sync --dev --all-extras
-
-    - name: Run pre-push checks
-      run: make pre-push
-
   security:
     name: Security Check
     runs-on: ubuntu-latest
