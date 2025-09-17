@@ -4,6 +4,17 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release (e.g., v1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'prerelease'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -53,6 +64,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
+        tag: ${{ github.event.inputs.tag_name || github.ref_name }}
+        prerelease: ${{ github.event.inputs.prerelease || false }}
         artifacts: "dist/*.whl"
         generateReleaseNotes: true
         makeLatest: "legacy"
