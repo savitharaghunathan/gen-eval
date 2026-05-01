@@ -1,85 +1,190 @@
 #!/usr/bin/env python3
 """
 Interactive Demo Script for GenEval Framework
-Allows control over number of test cases and shows detailed evaluation output
+Demonstrates both profile-based and direct metric evaluation.
 """
 
 import json
-import sys
 from pathlib import Path
 
 import yaml
-from dotenv import load_dotenv
 
 from geneval import GenEvalFramework
+from geneval.profile_manager import ProfileManager
 
-load_dotenv()
-
-# Add the project root to Python path
 project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
-
-# # Configure logging to show INFO level messages
-# logging.basicConfig(
-#     level=logging.INFO,
-#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-#     handlers=[
-#         logging.StreamHandler(sys.stdout)
-#     ]
-# )
 
 
 def load_test_data():
-    """Load test data from YAML file"""
     test_data_path = project_root / "tests" / "test_data_clean.yaml"
-
     if not test_data_path.exists():
         print(f"Test data file not found: {test_data_path}")
         return None
-
     with open(test_data_path) as f:
         return yaml.safe_load(f)
 
 
-def get_user_preferences():
-    """Get user preferences for the demo"""
-    print("GenEval Framework Interactive Demo")
-    print("=" * 50)
-
-    # Check if config file exists
+def check_config():
     config_path = project_root / "config" / "llm_config.yaml"
     if not config_path.exists():
-        print(f"\n LLM configuration file not found: {config_path}")
+        print(f"\nLLM configuration file not found: {config_path}")
         print("Please create a config file with your LLM provider settings.")
-        print("Example config:")
-        print("  providers:")
-        print("    openai:")
-        print("      enabled: true")
-        print("      default: true")
-        print('      api_key_env: "OPENAI_API_KEY"')
-        print('      model: "gpt-4o-mini"')
-        print("\nExiting demo - please configure your LLM settings first.")
-        return None, None
+        print("See config/llm_config.yaml.example or the README for details.")
+        return None
+    return str(config_path)
 
-    print(f"\nUsing LLM configuration from: {config_path}")
-    print("The framework will use the default provider from your config file.")
 
-    # Number of test cases
+def select_mode():
+    print("\nGenEval Framework Interactive Demo")
+    print("=" * 50)
+    print("\nEvaluation modes:")
+    print("  1. Profile-based evaluation (recommended)")
+    print("     Use a predefined profile with weighted scoring and pass/fail verdicts")
+    print("  2. Direct metric evaluation")
+    print("     Run individual metrics across all adapters")
+
+    while True:
+        choice = input("\nSelect mode (1 or 2, default: 1): ").strip()
+        if not choice or choice == "1":
+            return "profile"
+        if choice == "2":
+            return "direct"
+        print("Please enter 1 or 2")
+
+
+# ---------------------------------------------------------------------------
+# Profile-based evaluation
+# ---------------------------------------------------------------------------
+
+
+def select_profile():
+    pm = ProfileManager()
+    profiles = sorted(pm.list_profiles())
+
+    print("\nAvailable profiles:")
+    for i, name in enumerate(profiles, 1):
+        profile = pm.get_profile(name)
+        desc = profile.get("description", "")
+        metrics = ", ".join(profile["metrics"])
+        threshold = profile.get("composite_threshold", "N/A")
+        print(f"  {i}. {name:<20} {desc}")
+        print(f"     metrics: {metrics}")
+        print(f"     composite threshold: {threshold}")
+
+    while True:
+        choice = input(f"\nSelect profile (1-{len(profiles)}, default: 1): ").strip()
+        if not choice:
+            return profiles[0]
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(profiles):
+                return profiles[idx]
+        except ValueError:
+            pass
+        print(f"Please enter a number between 1 and {len(profiles)}")
+
+
+def select_num_cases(max_cases):
     while True:
         try:
-            num_cases = input("\nHow many test cases to run? (1-10, default: 3): ").strip()
-            if not num_cases:
-                num_cases = 3
-                break
-            num_cases = int(num_cases)
-            if 1 <= num_cases <= 10:
-                break
-            else:
-                print("Please enter a number between 1 and 10")
+            n = input(f"\nHow many test cases to run? (1-{max_cases}, default: 3): ").strip()
+            if not n:
+                return min(3, max_cases)
+            n = int(n)
+            if 1 <= n <= max_cases:
+                return n
+            print(f"Please enter a number between 1 and {max_cases}")
         except ValueError:
             print("Please enter a valid number")
 
-    # Metric selection - show unique metrics
+
+def run_profile_evaluation(framework, test_data):
+    profile_name = select_profile()
+    num_cases = select_num_cases(len(test_data["test_cases"]))
+
+    pm = ProfileManager()
+    profile = pm.get_profile(profile_name)
+
+    print("\nConfiguration:")
+    print(f"  Profile: {profile_name}")
+    print(f"  Metrics: {', '.join(profile['metrics'])}")
+    print(f"  Composite threshold: {profile.get('composite_threshold')}")
+    print(f"  Test cases: {num_cases}")
+
+    print(f"\n{'='*70}")
+    print(f"Running {num_cases} test cases with profile '{profile_name}'")
+    print(f"{'='*70}")
+
+    all_results = []
+
+    for i in range(num_cases):
+        tc = test_data["test_cases"][i]
+        print(f"\n--- Test Case {i+1}/{num_cases}: {tc['id']} ---")
+        print(f"  Question: {tc['user_input'][:80]}...")
+
+        try:
+            result = framework.evaluate_profile(
+                profile=profile_name,
+                question=tc["user_input"],
+                response=tc["response"],
+                reference=tc["reference"],
+                retrieval_context=tc["retrieved_contexts"],
+            )
+            all_results.append(result)
+
+            status = "PASSED" if result.overall_passed else "FAILED"
+            print(f"  Composite score: {result.composite_score:.4f} (threshold: {result.composite_threshold})")
+            print(f"  Status: {status}")
+
+            for mr in result.metric_results:
+                flag = "pass" if mr.passed else "FAIL"
+                print(f"    {mr.name:<35} {mr.score:.4f}  (threshold: {mr.threshold}, weight: {mr.weight}) [{flag}]")
+
+        except Exception as e:
+            print(f"  Error: {e}")
+
+    if not all_results:
+        print("\nNo results to summarize.")
+        return
+
+    # Summary
+    print(f"\n{'='*70}")
+    print(f"SUMMARY - Profile: {profile_name}")
+    print(f"{'='*70}")
+
+    passed = sum(1 for r in all_results if r.overall_passed)
+    print(f"Pass rate: {passed}/{len(all_results)} ({passed/len(all_results):.0%})")
+
+    all_metric_names = {mr.name for r in all_results for mr in r.metric_results}
+    print(f"\n{'Metric':<35} {'Avg Score':<12} {'Threshold':<12}")
+    print("-" * 59)
+    for mn in sorted(all_metric_names):
+        scores = [mr.score for r in all_results for mr in r.metric_results if mr.name == mn]
+        threshold = next(mr.threshold for r in all_results for mr in r.metric_results if mr.name == mn)
+        avg = sum(scores) / len(scores)
+        print(f"{mn:<35} {avg:<12.4f} {threshold:<12.2f}")
+
+    overall = "PASSED" if all(r.overall_passed for r in all_results) else "FAILED"
+    print(f"\nOverall: {overall}")
+
+    # JSON output option
+    save = input("\nSave full results to JSON? (y/N): ").strip().lower()
+    if save == "y":
+        output_path = input("Output file path (default: eval_results.json): ").strip()
+        if not output_path:
+            output_path = "eval_results.json"
+        results_json = [r.model_dump() for r in all_results]
+        with open(output_path, "w") as f:
+            json.dump(results_json, f, indent=2, default=str)
+        print(f"Results saved to {output_path}")
+
+
+# ---------------------------------------------------------------------------
+# Direct metric evaluation (original mode)
+# ---------------------------------------------------------------------------
+
+
+def select_direct_metrics(test_data):
     unique_metrics = [
         "context_precision_without_reference",
         "context_precision_with_reference",
@@ -92,243 +197,150 @@ def get_user_preferences():
         "context_precision",
     ]
 
-    print("\nAvailable metrics ( 9 unique):")
+    print("\nAvailable metrics (9 unique):")
     for i, metric in enumerate(unique_metrics, 1):
-        print(f"{i:2d}. {metric}")
+        print(f"  {i:2d}. {metric}")
 
-    print("\nNote: Some metrics (like 'faithfulness') are available in both RAGAS and DeepEval.")
-    print("This will give you up to 12 total evaluations from  9 unique concepts.")
-
-    print("\nMetric selection:")
-    print("- Enter 'all' for all  9 metrics (will run 12 evaluations)")
-    print("- Enter numbers (comma-separated, e.g., 1,3,6)")
+    print("\nNote: Some metrics are available in both RAGAS and DeepEval.")
+    print("Enter 'all' for all metrics, or numbers (comma-separated, e.g., 1,3,6)")
 
     while True:
         selection = input("\nSelect metrics (default: all): ").strip().lower()
         if not selection or selection == "all":
-            selected_metrics = unique_metrics
-            break
-        else:
-            try:
-                indices = [int(x.strip()) - 1 for x in selection.split(",")]
-                if all(0 <= i < len(unique_metrics) for i in indices):
-                    selected_metrics = [unique_metrics[i] for i in indices]
-                    break
-                else:
-                    print("Invalid metric numbers. Please use numbers 1- 9.")
-            except ValueError:
-                print("Please enter 'all' or numbers separated by commas (e.g., 1,3,6)")
-
-    return int(num_cases), selected_metrics
+            return unique_metrics
+        try:
+            indices = [int(x.strip()) - 1 for x in selection.split(",")]
+            if all(0 <= i < len(unique_metrics) for i in indices):
+                return [unique_metrics[i] for i in indices]
+            print("Invalid metric numbers.")
+        except ValueError:
+            print("Please enter 'all' or numbers separated by commas")
 
 
-def convert_to_framework_metrics(selected_metrics, test_data):
-    """Convert unique metrics to framework-specific format"""
-    ragas_available = test_data["framework_config"]["metrics"]["ragas"]
-    deepeval_available = test_data["framework_config"]["metrics"]["deepeval"]
-
+def convert_to_framework_metrics(selected_metrics, framework):
     framework_metrics = []
-
     for metric in selected_metrics:
-        # Add RAGAS version if available
-        if metric in ragas_available:
-            framework_metrics.append(f"ragas.{metric}")
-
-        # Add DeepEval version if available
-        if metric in deepeval_available:
-            framework_metrics.append(f"deepeval.{metric}")
-
+        for adapter_name, adapter in framework.adapters.items():
+            if metric in adapter.supported_metrics:
+                framework_metrics.append(f"{adapter_name}.{metric}")
     return framework_metrics
 
 
-def display_test_case_info(test_case, case_num, total_cases):
-    """Display information about the current test case"""
-    print(f"\n{'='*60}")
-    print(f"TEST CASE {case_num}/{total_cases}: {test_case['id']}")
-    print(f"{'='*60}")
-    print(f"Question: {test_case['user_input']}")
-    print(f"Response: {test_case['response']}")
-    print(f"Reference: {test_case['reference']}")
-    print(f"Context Length: {len(test_case['retrieved_contexts'])} characters")
+def run_direct_evaluation(framework, test_data):
+    selected_metrics = select_direct_metrics(test_data)
+    num_cases = select_num_cases(len(test_data["test_cases"]))
 
+    metrics = convert_to_framework_metrics(selected_metrics, framework)
 
-def display_evaluation_results(results):
-    """Display evaluation results in JSON format"""
-    json_results = {}
-    for metric_key, (adapter_name, output) in results.items():
-        json_results[metric_key] = {"adapter": adapter_name, "metrics": []}
-
-        for metric_result in output.metrics:
-            metric_data = {
-                "name": metric_result.name,
-                "score": metric_result.score,
-                "details": (metric_result.details if hasattr(metric_result, "details") else None),
-            }
-            json_results[metric_key]["metrics"].append(metric_data)
-
-        if output.metadata:
-            json_results[metric_key]["metadata"] = output.metadata
-
-    print(json.dumps(json_results, indent=2, ensure_ascii=False))
-
-
-def calculate_test_case_stats(all_results):
-    """Calculate statistics by test case and adapter.metric"""
-    adapter_metric_scores = {}
-
-    for case_idx, case_results in enumerate(all_results):
-        for _metric_key, (adapter_name, output) in case_results.items():
-            for metric_result in output.metrics:
-                # Use adapter.metric format to keep them separate
-                full_metric_name = f"{adapter_name}.{metric_result.name}"
-                if full_metric_name not in adapter_metric_scores:
-                    adapter_metric_scores[full_metric_name] = []
-                if metric_result.score is not None:
-                    adapter_metric_scores[full_metric_name].append({"case": case_idx + 1, "score": metric_result.score})
-
-    return adapter_metric_scores
-
-
-def display_final_summary(all_results, metrics, num_cases):
-    """Display final summary by test case and keep adapters separate"""
-    print(f"\n{'='*100}")
-    print(f"FINAL SUMMARY - {num_cases} Test Cases")
-    print(f"{'='*100}")
-
-    # Show which metrics ran in both frameworks
     ragas_metrics = [m for m in metrics if m.startswith("ragas.")]
     deepeval_metrics = [m for m in metrics if m.startswith("deepeval.")]
 
-    print(f"Total evaluations: {len(metrics)} ({len(ragas_metrics)} RAGAS + {len(deepeval_metrics)} DeepEval)")
-    print(f"Unique concepts: {len({m.split('.', 1)[1] for m in metrics})}")
-    print(f"{'='*100}")
+    print("\nConfiguration:")
+    print(f"  Test cases: {num_cases}")
+    print(f"  Selected metrics: {len(selected_metrics)} unique")
+    print(f"  Framework evaluations: {len(metrics)} total ({len(ragas_metrics)} RAGAS + {len(deepeval_metrics)} DeepEval)")
 
-    adapter_metric_scores = calculate_test_case_stats(all_results)
+    all_results = []
 
-    print(f"{'Adapter.Metric':<40} {'Cases':<8} {'Avg Score':<12} {'Min':<8} {'Max':<8}")
-    print("-" * 85)
+    for i in range(num_cases):
+        tc = test_data["test_cases"][i]
+        print(f"\n{'='*60}")
+        print(f"TEST CASE {i+1}/{num_cases}: {tc['id']}")
+        print(f"{'='*60}")
+        print(f"Question: {tc['user_input']}")
+        print(f"Response: {tc['response']}")
+        print(f"Reference: {tc['reference']}")
+        print(f"Context Length: {len(tc['retrieved_contexts'])} characters")
 
-    for full_metric_name, score_data in sorted(adapter_metric_scores.items()):
-        if score_data:
-            scores = [item["score"] for item in score_data]
-            avg_score = sum(scores) / len(scores)
-            min_score = min(scores)
-            max_score = max(scores)
-            print(f"{full_metric_name:<40} {len(scores):<8} {avg_score:<12.3f} {min_score:<8.3f} {max_score:<8.3f}")
-        else:
-            print(f"{full_metric_name:<40} {'0':<8} {'N/A':<12} {'N/A':<8} {'N/A':<8}")
+        try:
+            print(f"\nRunning evaluation with {len(metrics)} metrics...")
+            results = framework.evaluate(
+                question=tc["user_input"],
+                response=tc["response"],
+                reference=tc["reference"],
+                retrieval_context=tc["retrieved_contexts"],
+                metrics=metrics,
+            )
 
-    # Test case summary
-    print(f"\n{'='*60}")
-    print("TEST CASE SUMMARY")
-    print(f"{'='*60}")
-
-    for case_idx in range(num_cases):
-        case_num = case_idx + 1
-        print(f"\nTest Case {case_num}:")
-        case_metrics = {}
-
-        if case_idx < len(all_results):
-            case_results = all_results[case_idx]
-            for _metric_key, (adapter_name, output) in case_results.items():
+            json_results = {}
+            for metric_key, (adapter_name, output) in results.items():
+                json_results[metric_key] = {"adapter": adapter_name, "metrics": []}
                 for metric_result in output.metrics:
-                    full_metric_name = f"{adapter_name}.{metric_result.name}"
-                    if metric_result.score is not None:
-                        case_metrics[full_metric_name] = metric_result.score
+                    json_results[metric_key]["metrics"].append(
+                        {
+                            "name": metric_result.name,
+                            "score": metric_result.score,
+                            "details": metric_result.details if hasattr(metric_result, "details") else None,
+                        }
+                    )
+                if output.metadata:
+                    json_results[metric_key]["metadata"] = output.metadata
 
-        if case_metrics:
-            for metric_name, score in sorted(case_metrics.items()):
-                print(f"  {metric_name:<35}: {score:.3f}")
-        else:
-            print("  No results available")
+            print(json.dumps(json_results, indent=2, ensure_ascii=False))
+            all_results.append(results)
+
+        except Exception as e:
+            print(f"Error evaluating case {i+1}: {e}")
+
+    if all_results:
+        adapter_metric_scores = {}
+        for case_results in all_results:
+            for _key, (adapter_name, output) in case_results.items():
+                for mr in output.metrics:
+                    full_name = f"{adapter_name}.{mr.name}"
+                    if full_name not in adapter_metric_scores:
+                        adapter_metric_scores[full_name] = []
+                    if mr.score is not None:
+                        adapter_metric_scores[full_name].append(mr.score)
+
+        print(f"\n{'='*85}")
+        print(f"FINAL SUMMARY - {num_cases} Test Cases")
+        print(f"{'='*85}")
+        print(f"{'Adapter.Metric':<40} {'Cases':<8} {'Avg Score':<12} {'Min':<8} {'Max':<8}")
+        print("-" * 85)
+
+        for name, scores in sorted(adapter_metric_scores.items()):
+            if scores:
+                avg = sum(scores) / len(scores)
+                print(f"{name:<40} {len(scores):<8} {avg:<12.3f} {min(scores):<8.3f} {max(scores):<8.3f}")
+
+    print(f"\nDemo completed! Evaluated {len(all_results)} test cases successfully.")
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 
 def main():
-    """Main demo function"""
-    # Load test data
     test_data = load_test_data()
     if not test_data:
         return
 
-    # Get user preferences
-    preferences = get_user_preferences()
-    if preferences[0] is None:
+    config_path = check_config()
+    if not config_path:
         return
-    num_cases, selected_metrics = preferences
 
-    # Convert unique metrics to framework-specific format
-    metrics = convert_to_framework_metrics(selected_metrics, test_data)
+    mode = select_mode()
 
-    print("\nConfiguration:")
-    print("   LLM Provider: Config-driven")
-    print(f"   Test cases: {num_cases}")
-    print(f"   Selected metrics: {len(selected_metrics)} unique ({', '.join(selected_metrics)})")
-    print(f"   Framework evaluations: {len(metrics)} total ({', '.join(metrics)})")
+    print(f"\nUsing LLM configuration from: {config_path}")
+    print("Initializing GenEval Framework...")
 
-    # Show which metrics will run in both frameworks
-    ragas_metrics = [m for m in metrics if m.startswith("ragas.")]
-    deepeval_metrics = [m for m in metrics if m.startswith("deepeval.")]
-
-    print("\nFramework breakdown:")
-    print(f"   RAGAS evaluations: {len(ragas_metrics)} ({', '.join(ragas_metrics)})")
-    print(f"   DeepEval evaluations: {len(deepeval_metrics)} ({', '.join(deepeval_metrics)})")
-
-    # Show overlapping metrics
-    overlapping = []
-    for metric in selected_metrics:
-        if metric in ["faithfulness", "answer_relevancy", "context_recall"]:
-            overlapping.append(metric)
-
-    if overlapping:
-        print(f"\nOverlapping metrics (run in both frameworks): {', '.join(overlapping)}")
-        print(f"Expected total: {len(selected_metrics) + len(overlapping)} evaluations")
-
-    # Initialize framework with config path
-    print("\nInitializing GenEval Framework...")
     try:
-        config_path = str(project_root / "config" / "llm_config.yaml")
         framework = GenEvalFramework(config_path=config_path)
         print("Framework initialized successfully")
     except Exception as e:
         print(f"Framework initialization failed: {e}")
         print("Please check your config file and API keys.")
-        print("Exiting demo - please configure your LLM settings and try again")
         return
 
-    # Run evaluations
-    all_results = []
-
-    for i in range(num_cases):
-        test_case = test_data["test_cases"][i]
-
-        # Display test case info
-        display_test_case_info(test_case, i + 1, num_cases)
-
-        try:
-            # Run actual evaluation
-            print(f"\nRunning evaluation with {len(metrics)} metrics...")
-            results = framework.evaluate(
-                question=test_case["user_input"],
-                response=test_case["response"],
-                reference=test_case["reference"],
-                retrieval_context=test_case["retrieved_contexts"],
-                metrics=metrics,
-            )
-
-            # Display results
-            display_evaluation_results(results)
-            all_results.append(results)
-
-        except Exception as e:
-            print(f"Error evaluating case {i+1}: {e}")
-            continue
-
-    # Display final summary if we have results
-    if all_results:
-        display_final_summary(all_results, metrics, num_cases)
-
-    print("\nDemo completed!")
-    print(f"Evaluated {len(all_results)} test cases successfully")
+    try:
+        if mode == "profile":
+            run_profile_evaluation(framework, test_data)
+        else:
+            run_direct_evaluation(framework, test_data)
+    finally:
+        framework.close()
 
 
 if __name__ == "__main__":

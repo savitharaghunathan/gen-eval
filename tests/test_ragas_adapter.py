@@ -52,8 +52,9 @@ def _build_adapter(provider="openai", model="gpt-4o-mini", provider_config=None,
     with (
         patch.dict(os.environ, env, clear=True),
         patch("geneval.adapters.ragas_adapter.llm_factory") as mock_factory,
+        patch("geneval.adapters.ragas_adapter.AsyncOpenAI") as mock_async_openai,
         patch("geneval.adapters.ragas_adapter.OpenAI") as mock_openai,
-        patch("geneval.adapters.ragas_adapter.AzureOpenAI") as mock_azure,
+        patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI") as mock_async_azure,
         patch("geneval.adapters.ragas_adapter.Anthropic") as mock_anthropic,
         patch("geneval.adapters.ragas_adapter.RagasOpenAIEmbeddings"),
         patch("geneval.adapters.ragas_adapter.Faithfulness"),
@@ -66,7 +67,16 @@ def _build_adapter(provider="openai", model="gpt-4o-mini", provider_config=None,
     ):
         mock_factory.return_value = Mock()
         adapter = RAGASAdapter(mgr)
-        return adapter, mock_factory, {"openai": mock_openai, "azure": mock_azure, "anthropic": mock_anthropic}
+        return (
+            adapter,
+            mock_factory,
+            {
+                "async_openai": mock_async_openai,
+                "openai": mock_openai,
+                "async_azure": mock_async_azure,
+                "anthropic": mock_anthropic,
+            },
+        )
 
 
 class TestRAGASAdapterInit:
@@ -94,6 +104,7 @@ class TestRAGASAdapterInit:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -120,6 +131,41 @@ class TestRAGASAdapterInit:
         for metric in expected:
             assert metric in adapter.supported_metrics
 
+    def test_initialization_without_embeddings_excludes_answer_relevancy(self):
+        """When no embeddings are available, answer_relevancy should not be in available_metrics."""
+        mgr = _mock_llm_manager()
+        with (
+            patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True),
+            patch("geneval.adapters.ragas_adapter.llm_factory") as mock_factory,
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
+            patch("geneval.adapters.ragas_adapter.OpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.Anthropic"),
+            patch("geneval.adapters.ragas_adapter.RagasOpenAIEmbeddings"),
+            patch("geneval.adapters.ragas_adapter.Faithfulness"),
+            patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
+            patch("geneval.adapters.ragas_adapter.ContextPrecisionWithoutReference"),
+            patch("geneval.adapters.ragas_adapter.ContextPrecisionWithReference"),
+            patch("geneval.adapters.ragas_adapter.ContextRecall"),
+            patch("geneval.adapters.ragas_adapter.ContextEntityRecall"),
+            patch("geneval.adapters.ragas_adapter.NoiseSensitivity"),
+        ):
+            mock_factory.return_value = Mock()
+            with patch.object(RAGASAdapter, "_create_ragas_embeddings", return_value=None):
+                adapter = RAGASAdapter(mgr)
+
+            assert "answer_relevancy" not in adapter.supported_metrics
+            assert "answer_relevancy" not in adapter.available_metrics
+            assert len(adapter.supported_metrics) == 6
+
+    def test_initialization_with_embeddings_includes_answer_relevancy(self):
+        """When embeddings are available, answer_relevancy should be in available_metrics."""
+        adapter, _, _ = _build_adapter(env={"OPENAI_API_KEY": "test-key"})
+
+        assert "answer_relevancy" in adapter.supported_metrics
+        assert "answer_relevancy" in adapter.available_metrics
+        assert len(adapter.supported_metrics) == 7
+
     def test_llm_info_structure(self):
         adapter, _, _ = _build_adapter(
             provider_config={"model": "gpt-4o-mini", "enabled": True},
@@ -134,9 +180,8 @@ class TestRAGASAdapterInit:
 class TestOpenAIProvider:
     def test_success(self):
         adapter, mock_factory, clients = _build_adapter(env={"OPENAI_API_KEY": "test-key"})
-        from unittest.mock import call
 
-        assert call(api_key="test-key") in clients["openai"].call_args_list
+        clients["async_openai"].assert_called_once_with(api_key="test-key")
         mock_factory.assert_called_once()
         call_kwargs = mock_factory.call_args
         assert call_kwargs[0][0] == "gpt-4o-mini"
@@ -147,6 +192,7 @@ class TestOpenAIProvider:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -164,6 +210,7 @@ class TestOpenAIProvider:
         with (
             patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -177,20 +224,19 @@ class TestOpenAIProvider:
                 RAGASAdapter(mgr)
 
     def test_custom_env_var(self):
-        from unittest.mock import call
-
         adapter, _, clients = _build_adapter(
             provider_config={"model": "gpt-4o-mini", "api_key_env": "CUSTOM_OPENAI_KEY"},
             env={"CUSTOM_OPENAI_KEY": "custom-key"},
         )
-        assert call(api_key="custom-key") in clients["openai"].call_args_list
+        clients["async_openai"].assert_called_once_with(api_key="custom-key")
 
     def test_llm_creation_exception(self):
         mgr = _mock_llm_manager()
         with (
             patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
-            patch("geneval.adapters.ragas_adapter.OpenAI") as mock_openai,
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI") as mock_async_openai,
+            patch("geneval.adapters.ragas_adapter.OpenAI"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
             patch("geneval.adapters.ragas_adapter.ContextPrecisionWithoutReference"),
@@ -199,7 +245,7 @@ class TestOpenAIProvider:
             patch("geneval.adapters.ragas_adapter.ContextEntityRecall"),
             patch("geneval.adapters.ragas_adapter.NoiseSensitivity"),
         ):
-            mock_openai.side_effect = Exception("Connection failed")
+            mock_async_openai.side_effect = Exception("Connection failed")
             with pytest.raises(ValueError, match="No LLM available"):
                 RAGASAdapter(mgr)
 
@@ -221,6 +267,7 @@ class TestAnthropicProvider:
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -242,7 +289,7 @@ class TestGeminiProvider:
             provider_config={"model": "gemini-1.5-flash"},
             env={"GOOGLE_API_KEY": "test-key"},
         )
-        clients["openai"].assert_called_once_with(
+        clients["async_openai"].assert_called_once_with(
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
             api_key="test-key",
         )
@@ -257,7 +304,7 @@ class TestOllamaProvider:
             provider_config={"model": "llama3.2", "base_url": "http://localhost:11434"},
             env={},
         )
-        clients["openai"].assert_called_once_with(
+        clients["async_openai"].assert_called_once_with(
             base_url="http://localhost:11434/v1",
             api_key="ollama",
         )
@@ -269,7 +316,7 @@ class TestOllamaProvider:
             provider_config={"model": "llama3.2"},
             env={},
         )
-        clients["openai"].assert_called_once_with(
+        clients["async_openai"].assert_called_once_with(
             base_url="http://localhost:11434/v1",
             api_key="ollama",
         )
@@ -287,8 +334,9 @@ class TestVLLMProvider:
         with (
             patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory") as mock_factory,
-            patch("geneval.adapters.ragas_adapter.OpenAI") as mock_openai,
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI") as mock_async_openai,
+            patch("geneval.adapters.ragas_adapter.OpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.RagasOpenAIEmbeddings"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
@@ -303,7 +351,7 @@ class TestVLLMProvider:
 
             mock_factory.return_value = Mock()
             RAGASAdapter(mgr)
-            assert call(base_url="https://vllm-server.com/v1", api_key="test-key") in mock_openai.call_args_list
+            assert call(base_url="https://vllm-server.com/v1", api_key="test-key") in mock_async_openai.call_args_list
 
     def test_ssl_disabled(self):
         mgr = _mock_llm_manager(
@@ -316,11 +364,12 @@ class TestVLLMProvider:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory") as mock_factory,
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.RagasOpenAIEmbeddings"),
-            patch("geneval.adapters.ragas_adapter.httpx.Client") as mock_httpx,
+            patch("geneval.adapters.ragas_adapter.httpx.AsyncClient") as mock_httpx,
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
             patch("geneval.adapters.ragas_adapter.ContextPrecisionWithoutReference"),
@@ -341,8 +390,9 @@ class TestVLLMProvider:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -374,7 +424,7 @@ class TestAzureOpenAIProvider:
             provider_config=config,
             env={},
         )
-        clients["azure"].assert_called_once_with(
+        clients["async_azure"].assert_called_once_with(
             api_key="test-key",
             azure_endpoint="https://test.openai.azure.com/",
             azure_deployment="gpt-4-deployment",
@@ -388,8 +438,9 @@ class TestAzureOpenAIProvider:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -409,8 +460,9 @@ class TestAzureOpenAIProvider:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -430,8 +482,9 @@ class TestAzureOpenAIProvider:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -451,8 +504,9 @@ class TestAzureOpenAIProvider:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -474,7 +528,7 @@ class TestDeepSeekProvider:
             provider_config={"model": "deepseek-chat"},
             env={"DEEPSEEK_API_KEY": "test-key"},
         )
-        clients["openai"].assert_called_once_with(
+        clients["async_openai"].assert_called_once_with(
             base_url="https://api.deepseek.com/v1",
             api_key="test-key",
         )
@@ -485,8 +539,9 @@ class TestDeepSeekProvider:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -504,8 +559,9 @@ class TestDeepSeekProvider:
         with (
             patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -519,15 +575,16 @@ class TestDeepSeekProvider:
                 RAGASAdapter(mgr)
 
     def test_custom_env_var(self):
-        from unittest.mock import call
-
         adapter, _, clients = _build_adapter(
             provider="deepseek",
             model="deepseek-chat",
             provider_config={"model": "deepseek-chat", "api_key_env": "CUSTOM_DEEPSEEK_KEY"},
             env={"CUSTOM_DEEPSEEK_KEY": "custom-key"},
         )
-        assert call(base_url="https://api.deepseek.com/v1", api_key="custom-key") in clients["openai"].call_args_list
+        clients["async_openai"].assert_called_once_with(
+            base_url="https://api.deepseek.com/v1",
+            api_key="custom-key",
+        )
 
 
 class TestAmazonBedrockProvider:
@@ -539,8 +596,9 @@ class TestAmazonBedrockProvider:
         with (
             patch.dict(os.environ, {"AWS_ACCESS_KEY_ID": "test-key", "AWS_SECRET_ACCESS_KEY": "test-secret"}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -561,8 +619,9 @@ class TestAmazonBedrockProvider:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -580,8 +639,9 @@ class TestAmazonBedrockProvider:
         with (
             patch.dict(os.environ, {"AWS_ACCESS_KEY_ID": "k", "AWS_SECRET_ACCESS_KEY": "s"}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),
@@ -601,8 +661,9 @@ class TestUnknownProvider:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("geneval.adapters.ragas_adapter.llm_factory"),
+            patch("geneval.adapters.ragas_adapter.AsyncOpenAI"),
             patch("geneval.adapters.ragas_adapter.OpenAI"),
-            patch("geneval.adapters.ragas_adapter.AzureOpenAI"),
+            patch("geneval.adapters.ragas_adapter.AsyncAzureOpenAI"),
             patch("geneval.adapters.ragas_adapter.Anthropic"),
             patch("geneval.adapters.ragas_adapter.Faithfulness"),
             patch("geneval.adapters.ragas_adapter.AnswerRelevancy"),

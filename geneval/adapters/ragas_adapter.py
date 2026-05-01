@@ -3,7 +3,7 @@ import os
 
 import httpx
 from anthropic import Anthropic
-from openai import AzureOpenAI, OpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI, OpenAI
 from ragas.embeddings import OpenAIEmbeddings as RagasOpenAIEmbeddings
 from ragas.llms import llm_factory
 from ragas.metrics.collections import (
@@ -94,9 +94,13 @@ class RAGASAdapter:
                 "context_recall": ContextRecall(llm=self.llm),
                 "context_entity_recall": ContextEntityRecall(llm=self.llm),
                 "noise_sensitivity": NoiseSensitivity(llm=self.llm),
-                "answer_relevancy": AnswerRelevancy(llm=self.llm, embeddings=ragas_embeddings) if ragas_embeddings else AnswerRelevancy(llm=self.llm),
                 "faithfulness": Faithfulness(llm=self.llm),
             }
+
+            if ragas_embeddings:
+                self.available_metrics["answer_relevancy"] = AnswerRelevancy(llm=self.llm, embeddings=ragas_embeddings)
+            else:
+                self.logger.warning("answer_relevancy metric unavailable: no embeddings configured")
             self.logger.info(f"RAGAS metrics initialized successfully with {len(self.available_metrics)} metrics")
         except Exception as e:
             self.logger.error(f"Failed to initialize RAGAS metrics: {e}")
@@ -155,7 +159,7 @@ class RAGASAdapter:
         if not model:
             self.logger.error("OpenAI model not specified in configuration")
             return None
-        return OpenAI(api_key=api_key), "openai"
+        return AsyncOpenAI(api_key=api_key), "openai"
 
     def _create_azure_openai_client(self) -> tuple | None:
         provider_config = self.llm_manager.get_provider_config("azure_openai")
@@ -176,7 +180,7 @@ class RAGASAdapter:
             self.logger.error("Azure OpenAI endpoint not specified in configuration")
             return None
         openai_api_version = provider_config.get("openai_api_version", "2025-01-01-preview")
-        client = AzureOpenAI(
+        client = AsyncAzureOpenAI(
             api_key=api_key,
             azure_endpoint=azure_endpoint,
             azure_deployment=deployment_name,
@@ -208,7 +212,7 @@ class RAGASAdapter:
         if not model:
             self.logger.error("Gemini model not specified in configuration")
             return None
-        client = OpenAI(
+        client = AsyncOpenAI(
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
             api_key=api_key,
         )
@@ -221,7 +225,7 @@ class RAGASAdapter:
         if not model:
             self.logger.error("Ollama model not specified in configuration")
             return None
-        client = OpenAI(base_url=f"{base_url}/v1", api_key="ollama")
+        client = AsyncOpenAI(base_url=f"{base_url}/v1", api_key="ollama")
         return client, "openai"
 
     def _create_vllm_client(self) -> tuple | None:
@@ -249,10 +253,10 @@ class RAGASAdapter:
         client_kwargs = {"base_url": full_base_url, "api_key": api_key}
 
         if not ssl_verify:
-            client_kwargs["http_client"] = httpx.Client(verify=False, timeout=30)
+            client_kwargs["http_client"] = httpx.AsyncClient(verify=False, timeout=30)
             self.logger.warning(f"SSL verification disabled for vLLM provider: {base_url}")
 
-        client = OpenAI(**client_kwargs)
+        client = AsyncOpenAI(**client_kwargs)
         self.logger.info(f"Created vLLM provider: {model} at {full_base_url} (SSL verify: {ssl_verify})")
         return client, "openai"
 
@@ -267,7 +271,7 @@ class RAGASAdapter:
         if not model:
             self.logger.error("DeepSeek model not specified in configuration")
             return None
-        client = OpenAI(base_url="https://api.deepseek.com/v1", api_key=api_key)
+        client = AsyncOpenAI(base_url="https://api.deepseek.com/v1", api_key=api_key)
         return client, "openai"
 
     def _create_amazon_bedrock_client(self) -> tuple | None:

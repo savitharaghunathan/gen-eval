@@ -51,6 +51,21 @@ class GenEvalFramework:
         if self.llm_info:
             self.logger.info(f"Using LLM: {self.llm_info['provider']} - {self.llm_info['model']}")
 
+    def close(self):
+        for adapter in self.adapters.values():
+            if hasattr(adapter, "close"):
+                try:
+                    adapter.close()
+                except Exception as e:
+                    self.logger.warning(f"Error closing adapter: {e}")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
+
     def evaluate(self, **kwargs) -> dict:
         """
         Evaluate the model's response using the appropriate adapter

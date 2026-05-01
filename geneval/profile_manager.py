@@ -158,6 +158,10 @@ class ProfileManager:
         scores = {}
         for metric_name in profile["metrics"]:
             candidates = resolve_metric_candidates(metric_name)
+            # Filter to adapters that actually support this metric at runtime
+            adapters = getattr(framework, "adapters", None)
+            if isinstance(adapters, dict):
+                candidates = [(name, cls) for name, cls in candidates if name in adapters and metric_name in adapters[name].supported_metrics]
             resolved = False
             for adapter_name, adapter_metric_class in candidates:
                 try:
