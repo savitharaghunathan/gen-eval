@@ -165,7 +165,11 @@ def run_profile_evaluation(framework, test_data):
         print(f"{mn:<35} {avg:<12.4f} {threshold:<12.2f}")
 
     overall = "PASSED" if all(r.overall_passed for r in all_results) else "FAILED"
-    print(f"\nOverall: {overall}")
+    failed = len(all_results) - passed
+    if overall == "FAILED":
+        print(f"\nOverall: FAILED — {failed} of {len(all_results)} test case(s) scored below threshold")
+    else:
+        print(f"\nOverall: PASSED — all {len(all_results)} test case(s) met threshold")
 
     # JSON output option
     save = input("\nSave full results to JSON? (y/N): ").strip().lower()
