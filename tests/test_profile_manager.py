@@ -98,6 +98,13 @@ class TestProfileManagerLoading:
         with pytest.raises(FileNotFoundError):
             ProfileManager(profiles_path="/nonexistent/path.yaml")
 
+    def test_get_profile_returns_copy(self):
+        pm = ProfileManager()
+        profile = pm.get_profile("rag_default")
+        profile["description"] = "MUTATED"
+        original = pm.get_profile("rag_default")
+        assert original["description"] != "MUTATED"
+
 
 class TestProfileManagerValidation:
     def test_weights_must_sum_to_one(self, tmp_path):
@@ -405,3 +412,45 @@ class TestProfileManagerEvaluate:
         assert isinstance(result, BatchResult)
         assert len(result.case_results) == 2
         assert result.pass_rate == 1.0
+
+    def test_evaluate_falls_back_to_second_adapter(self, tmp_path):
+        data = _valid_profile_data()
+        path = str(tmp_path / "profiles.yaml")
+        _write_yaml(data, path)
+
+        pm = ProfileManager(profiles_path=path)
+        framework = Mock()
+        framework.llm_info = {"provider": "openai", "model": "gpt-4o-mini"}
+
+        call_count = {"n": 0}
+
+        def evaluate_side_effect(**kwargs):
+            call_count["n"] += 1
+            metric_str = kwargs["metrics"][0]
+            parts = metric_str.split(".", 1)
+            adapter = parts[0]
+            metric_name = parts[1]
+            if adapter == "ragas":
+                raise RuntimeError("RAGAS unavailable")
+            mock_output = Mock(spec=Output)
+            mock_output.metrics = [Mock(spec=MetricResult)]
+            mock_output.metrics[0].name = metric_name
+            mock_output.metrics[0].score = 0.85
+            mock_output.metrics[0].details = "fallback"
+            return {metric_str: (adapter, mock_output)}
+
+        framework.evaluate.side_effect = evaluate_side_effect
+
+        result = pm.evaluate(
+            framework=framework,
+            profile_name="test_profile",
+            question="Q?",
+            response="A.",
+            reference="A.",
+            retrieval_context="Ctx.",
+        )
+
+        assert isinstance(result, ProfileResult)
+        for mr in result.metric_results:
+            assert mr.adapter == "deepeval"
+            assert mr.score == 0.85

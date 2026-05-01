@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 
 from geneval.exceptions import ProfileNotFoundError, ProfileValidationError, UnknownMetricError
-from geneval.metric_registry import get_available_metrics, resolve_metric
+from geneval.metric_registry import get_available_metrics, resolve_metric_candidates
 from geneval.schemas import BatchResult, MetricEvaluation, ProfileResult
 
 _WEIGHT_TOLERANCE = 1e-6
@@ -76,7 +76,7 @@ class ProfileManager:
     def get_profile(self, name: str) -> dict:
         if name not in self._profiles:
             raise ProfileNotFoundError(name)
-        return self._profiles[name]
+        return copy.deepcopy(self._profiles[name])
 
     def list_profiles(self) -> list[str]:
         return list(self._profiles.keys())
@@ -157,28 +157,30 @@ class ProfileManager:
     def _run_metrics(self, framework, profile: dict, question: str, response: str, reference: str, retrieval_context: str) -> dict[str, tuple]:
         scores = {}
         for metric_name in profile["metrics"]:
-            adapter_name, adapter_metric_class = resolve_metric(metric_name)
-            try:
-                raw_results = framework.evaluate(
-                    question=question,
-                    response=response,
-                    reference=reference,
-                    retrieval_context=retrieval_context,
-                    metrics=[f"{adapter_name}.{adapter_metric_class}"],
-                )
-                key = f"{adapter_name}.{adapter_metric_class}"
-                if key in raw_results:
-                    _, output = raw_results[key]
-                    if output.metrics:
-                        result_metric = output.metrics[0]
-                        scores[metric_name] = (result_metric.score, adapter_name, result_metric.details)
-                    else:
-                        scores[metric_name] = (None, adapter_name, None)
-                else:
-                    scores[metric_name] = (None, adapter_name, None)
-            except Exception as e:
-                logger.warning(f"Adapter '{adapter_name}' failed for metric '{metric_name}': {e}")
-                scores[metric_name] = (None, adapter_name, None)
+            candidates = resolve_metric_candidates(metric_name)
+            resolved = False
+            for adapter_name, adapter_metric_class in candidates:
+                try:
+                    raw_results = framework.evaluate(
+                        question=question,
+                        response=response,
+                        reference=reference,
+                        retrieval_context=retrieval_context,
+                        metrics=[f"{adapter_name}.{adapter_metric_class}"],
+                    )
+                    key = f"{adapter_name}.{adapter_metric_class}"
+                    if key in raw_results:
+                        _, output = raw_results[key]
+                        if output.metrics:
+                            result_metric = output.metrics[0]
+                            scores[metric_name] = (result_metric.score, adapter_name, result_metric.details)
+                            resolved = True
+                            break
+                except Exception as e:
+                    logger.warning(f"Adapter '{adapter_name}' failed for metric '{metric_name}': {e}")
+            if not resolved:
+                last_adapter = candidates[-1][0] if candidates else "unknown"
+                scores[metric_name] = (None, last_adapter, None)
         return scores
 
     def evaluate(

@@ -40,5 +40,12 @@ def resolve_metric(metric_name: str) -> tuple[str, str]:
     return best["adapter"], best["metric_class"]
 
 
+def resolve_metric_candidates(metric_name: str) -> list[tuple[str, str]]:
+    entries = METRIC_REGISTRY.get(metric_name)
+    if not entries:
+        raise UnknownMetricError(metric_name, available=get_available_metrics())
+    return [(e["adapter"], e["metric_class"]) for e in entries]
+
+
 def get_available_metrics() -> list[str]:
     return list(METRIC_REGISTRY.keys())

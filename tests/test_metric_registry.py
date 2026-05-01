@@ -1,7 +1,7 @@
 import pytest
 
 from geneval.exceptions import UnknownMetricError
-from geneval.metric_registry import METRIC_REGISTRY, get_available_metrics, resolve_metric
+from geneval.metric_registry import METRIC_REGISTRY, get_available_metrics, resolve_metric, resolve_metric_candidates
 
 
 class TestMetricRegistry:
@@ -61,6 +61,23 @@ class TestResolveMetric:
             resolve_metric("hallucination_score")
         assert exc_info.value.available is not None
         assert "faithfulness" in exc_info.value.available
+
+
+class TestResolveMetricCandidates:
+    def test_returns_all_candidates_in_priority_order(self):
+        candidates = resolve_metric_candidates("faithfulness")
+        assert len(candidates) == 2
+        assert candidates[0] == ("ragas", "faithfulness")
+        assert candidates[1] == ("deepeval", "faithfulness")
+
+    def test_single_candidate(self):
+        candidates = resolve_metric_candidates("noise_sensitivity")
+        assert len(candidates) == 1
+        assert candidates[0] == ("ragas", "noise_sensitivity")
+
+    def test_unknown_metric_raises(self):
+        with pytest.raises(UnknownMetricError):
+            resolve_metric_candidates("nonexistent")
 
 
 class TestGetAvailableMetrics:

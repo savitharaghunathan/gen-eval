@@ -1,6 +1,7 @@
 import sys
 
 import click
+import yaml
 
 from geneval.exceptions import ProfileNotFoundError, ProfileValidationError, UnknownMetricError
 from geneval.framework import GenEvalFramework
@@ -131,7 +132,7 @@ def profiles_validate(path):
     try:
         ProfileManager(profiles_path=path)
         click.echo(f"Valid: {path}")
-    except (ProfileValidationError, UnknownMetricError) as e:
+    except (ProfileValidationError, UnknownMetricError, yaml.YAMLError) as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(2)
     except FileNotFoundError as e:
