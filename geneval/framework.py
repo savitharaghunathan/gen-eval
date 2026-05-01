@@ -5,12 +5,15 @@ This module provides the unified interface for evaluating generative AI models
 across different frameworks like RAGAS and DeepEval.
 """
 
+from __future__ import annotations
+
 import logging
 
 from geneval.adapters.deepeval_adapter import DeepEvalAdapter
 from geneval.adapters.ragas_adapter import RAGASAdapter
 from geneval.llm_manager import LLMManager
-from geneval.schemas import Input
+from geneval.profile_manager import ProfileManager
+from geneval.schemas import BatchResult, Input, ProfileResult
 
 
 class GenEvalFramework:
@@ -107,3 +110,45 @@ class GenEvalFramework:
 
         self.logger.info(f"Evaluation completed with {len(results)} results")
         return results
+
+    def evaluate_profile(
+        self,
+        profile: str | None = None,
+        policy: str | None = None,
+        profiles_path: str | None = None,
+        question: str = "",
+        response: str = "",
+        reference: str = "",
+        retrieval_context: str = "",
+    ) -> ProfileResult:
+        if not profile and not policy:
+            raise ValueError("Either profile or policy must be provided")
+
+        pm = ProfileManager(profiles_path=profiles_path)
+        return pm.evaluate(
+            framework=self,
+            profile_name=profile,
+            policy_name=policy,
+            question=question,
+            response=response,
+            reference=reference,
+            retrieval_context=retrieval_context,
+        )
+
+    def evaluate_profile_batch(
+        self,
+        data_path: str,
+        profile: str | None = None,
+        policy: str | None = None,
+        profiles_path: str | None = None,
+    ) -> BatchResult:
+        if not profile and not policy:
+            raise ValueError("Either profile or policy must be provided")
+
+        pm = ProfileManager(profiles_path=profiles_path)
+        return pm.evaluate_batch(
+            framework=self,
+            data_path=data_path,
+            profile_name=profile,
+            policy_name=policy,
+        )

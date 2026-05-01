@@ -694,6 +694,7 @@ name = "gen-eval"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
+    { name = "click" },
     { name = "datasets" },
     { name = "deepeval" },
     { name = "langchain" },
@@ -730,6 +731,7 @@ test = [
 requires-dist = [
     { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.7.0" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=24.0.0" },
+    { name = "click", specifier = ">=8.0.0" },
     { name = "datasets", specifier = ">=4.0.0" },
     { name = "deepeval", specifier = ">=3.3.2" },
     { name = "isort", marker = "extra == 'dev'", specifier = ">=5.13.0" },
