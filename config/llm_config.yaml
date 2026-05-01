@@ -4,7 +4,7 @@
 providers:
   openai:
     enabled: true
-    default: true  # This provider will be used by default
+    default: false
     api_key_env: "OPENAI_API_KEY"
     model: "gpt-4o"
 
@@ -33,9 +33,9 @@ providers:
 
   gemini:
     enabled: true
-    default: false
-    api_key_env: "GOOGLE_API_KEY"
-    model: "gemini-2.0-flash"
+    default: true
+    api_key_env: "GEMINI_API_KEY"
+    model: "gemini-2.5-flash"
     temperature: 0.1
 
   deepseek:
@@ -56,7 +56,7 @@ providers:
     enabled: true
     default: false
     base_url_env: "VLLM_BASE_URL"
-    model: "gemini-2.0-flash"
+    model: "gemini-2.5-flash"
     api_path_env: "VLLM_API_PATH"
     api_key_env: "OPENAI_API_KEY"  # If your vLLM server requires authentication
     ssl_verify: false
@@ -67,4 +67,4 @@ settings:
   timeout: 30  # Request timeout in seconds
   max_retries: 3  # Maximum retry attempts
   temperature: 0.1  # Default temperature for evaluations
-  max_tokens: 1000  # Default max tokens for responses
+  max_tokens: 4096  # Default max tokens for responses

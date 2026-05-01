@@ -147,6 +147,12 @@ class TestDeepEvalAdapter:
         assert adapter.llm_info["model"] == "gemini-1.5-flash"
         assert adapter.model == mock_model
 
+        mock_gemini_model.assert_called_once_with(
+            model="gemini-1.5-flash",
+            api_key="test-key",
+            temperature=0.1,
+        )
+
     @patch("geneval.adapters.deepeval_adapter.DeepSeekModel")
     def test_initialization_success_deepseek(self, mock_deepseek_model):
         """Test successful DeepEvalAdapter initialization with DeepSeek"""

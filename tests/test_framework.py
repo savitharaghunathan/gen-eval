@@ -713,3 +713,80 @@ class TestGenEvalFramework:
                 reference=None,
                 metrics=["faithfulness"],
             )
+
+    @patch("geneval.framework.RAGASAdapter")
+    @patch("geneval.framework.DeepEvalAdapter")
+    @patch("geneval.framework.LLMManager")
+    def test_close_calls_adapter_close(
+        self,
+        mock_llm_manager_class,
+        mock_deepeval_adapter_class,
+        mock_ragas_adapter_class,
+    ):
+        mock_llm_manager = Mock(spec=LLMManager)
+        mock_llm_manager.get_default_provider.return_value = "openai"
+        mock_llm_manager.get_provider_config.return_value = {"model": "gpt-4o-mini"}
+        mock_llm_manager_class.return_value = mock_llm_manager
+
+        mock_ragas_adapter = Mock(spec=RAGASAdapter)
+        mock_deepeval_adapter = Mock(spec=DeepEvalAdapter)
+        mock_ragas_adapter_class.return_value = mock_ragas_adapter
+        mock_deepeval_adapter_class.return_value = mock_deepeval_adapter
+        mock_ragas_adapter.supported_metrics = ["faithfulness"]
+        mock_deepeval_adapter.supported_metrics = ["faithfulness"]
+
+        framework = GenEvalFramework("test_config.yaml")
+        framework.close()
+
+        mock_deepeval_adapter.close.assert_called_once()
+
+    @patch("geneval.framework.RAGASAdapter")
+    @patch("geneval.framework.DeepEvalAdapter")
+    @patch("geneval.framework.LLMManager")
+    def test_context_manager(
+        self,
+        mock_llm_manager_class,
+        mock_deepeval_adapter_class,
+        mock_ragas_adapter_class,
+    ):
+        mock_llm_manager = Mock(spec=LLMManager)
+        mock_llm_manager.get_default_provider.return_value = "openai"
+        mock_llm_manager.get_provider_config.return_value = {"model": "gpt-4o-mini"}
+        mock_llm_manager_class.return_value = mock_llm_manager
+
+        mock_ragas_adapter = Mock(spec=RAGASAdapter)
+        mock_deepeval_adapter = Mock(spec=DeepEvalAdapter)
+        mock_ragas_adapter_class.return_value = mock_ragas_adapter
+        mock_deepeval_adapter_class.return_value = mock_deepeval_adapter
+        mock_ragas_adapter.supported_metrics = ["faithfulness"]
+        mock_deepeval_adapter.supported_metrics = ["faithfulness"]
+
+        with GenEvalFramework("test_config.yaml") as framework:
+            assert "ragas" in framework.adapters
+
+        mock_deepeval_adapter.close.assert_called_once()
+
+    @patch("geneval.framework.RAGASAdapter")
+    @patch("geneval.framework.DeepEvalAdapter")
+    @patch("geneval.framework.LLMManager")
+    def test_close_handles_adapter_error(
+        self,
+        mock_llm_manager_class,
+        mock_deepeval_adapter_class,
+        mock_ragas_adapter_class,
+    ):
+        mock_llm_manager = Mock(spec=LLMManager)
+        mock_llm_manager.get_default_provider.return_value = "openai"
+        mock_llm_manager.get_provider_config.return_value = {"model": "gpt-4o-mini"}
+        mock_llm_manager_class.return_value = mock_llm_manager
+
+        mock_ragas_adapter = Mock(spec=RAGASAdapter)
+        mock_deepeval_adapter = Mock(spec=DeepEvalAdapter)
+        mock_ragas_adapter_class.return_value = mock_ragas_adapter
+        mock_deepeval_adapter_class.return_value = mock_deepeval_adapter
+        mock_ragas_adapter.supported_metrics = ["faithfulness"]
+        mock_deepeval_adapter.supported_metrics = ["faithfulness"]
+        mock_deepeval_adapter.close.side_effect = Exception("close failed")
+
+        framework = GenEvalFramework("test_config.yaml")
+        framework.close()

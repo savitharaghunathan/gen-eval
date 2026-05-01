@@ -99,25 +99,9 @@ class VLLMModel(DeepEvalBaseLLM):
         except Exception as e:
             raise RuntimeError(f"Error calling vLLM API: {e}") from e
 
-    def __del__(self) -> None:
-        """Clean up HTTP clients"""
+    def close(self):
         if hasattr(self, "sync_client"):
             self.sync_client.close()
-        if hasattr(self, "async_client"):
-            # For async client cleanup in destructor, we need to handle it carefully
-            try:
-                import asyncio
-
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If loop is running, schedule the cleanup
-                    loop.create_task(self.async_client.aclose())
-                else:
-                    # If no loop is running, run it synchronously
-                    asyncio.run(self.async_client.aclose())
-            except Exception:
-                # If there are issues with cleanup, just pass
-                pass
 
 
 class DeepEvalAdapter:
@@ -157,15 +141,16 @@ class DeepEvalAdapter:
 
         # Initialize model for DeepEval
         self.model = self._create_model()
+        self._disable_unused_async_transport()
 
         # Initialize metrics
         try:
             self.available_metrics = {
-                "answer_relevancy": AnswerRelevancyMetric(model=self.model),
-                "context_relevance": ContextualRelevancyMetric(model=self.model),
-                "faithfulness": FaithfulnessMetric(model=self.model),
-                "context_recall": ContextualRecallMetric(model=self.model),
-                "context_precision": ContextualPrecisionMetric(model=self.model),
+                "answer_relevancy": AnswerRelevancyMetric(model=self.model, async_mode=False),
+                "context_relevance": ContextualRelevancyMetric(model=self.model, async_mode=False),
+                "faithfulness": FaithfulnessMetric(model=self.model, async_mode=False),
+                "context_recall": ContextualRecallMetric(model=self.model, async_mode=False),
+                "context_precision": ContextualPrecisionMetric(model=self.model, async_mode=False),
             }
             self.logger.info(f"DeepEval metrics initialized successfully with {len(self.available_metrics)} metrics")
         except Exception as e:
@@ -174,6 +159,27 @@ class DeepEvalAdapter:
 
         # Set supported metrics based on available metrics
         self.supported_metrics = list(self.available_metrics.keys())
+
+    def _disable_unused_async_transport(self):
+        """Patch GeminiModel.load_model() to nullify the async transport that
+        google.genai.Client eagerly creates in __init__.  With async_mode=False
+        the transport is never used, but its __del__ schedules orphaned asyncio
+        tasks that produce 'Task was destroyed' warnings."""
+        if not hasattr(self.model, "load_model") or not hasattr(self.model, "_module"):
+            return
+        original_load_model = self.model.load_model
+
+        def _load_model_without_async(self_unused=None):
+            client = original_load_model()
+            if hasattr(client, "_api_client"):
+                client._api_client._async_httpx_client = None
+            return client
+
+        self.model.load_model = _load_model_without_async
+
+    def close(self):
+        if hasattr(self, "model") and hasattr(self.model, "close"):
+            self.model.close()
 
     def _create_model(self) -> None:
         """Create DeepEval model instance based on LLM configuration"""
@@ -282,7 +288,7 @@ class DeepEvalAdapter:
 
             # Create GeminiModel
             gemini_model = GeminiModel(
-                model_name=deepeval_config["model"],
+                model=deepeval_config["model"],
                 api_key=api_key,
                 temperature=deepeval_config["temperature"],
             )

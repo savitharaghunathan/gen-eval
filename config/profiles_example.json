@@ -1,0 +1,86 @@
+{
+  "profiles": {
+    "medical": {
+      "description": "Medical domain — prioritises factual accuracy",
+      "metrics": ["faithfulness", "answer_relevancy", "context_recall"],
+      "weights": {
+        "faithfulness": 0.6,
+        "answer_relevancy": 0.2,
+        "context_recall": 0.2
+      },
+      "criteria": {
+        "faithfulness": 0.95,
+        "answer_relevancy": 0.8,
+        "context_recall": 0.8
+      },
+      "composite_threshold": 0.9
+    },
+    "legal": {
+      "description": "Legal domain — strict on recall and precision",
+      "metrics": ["faithfulness", "context_recall", "context_precision"],
+      "weights": {
+        "faithfulness": 0.4,
+        "context_recall": 0.35,
+        "context_precision": 0.25
+      },
+      "criteria": {
+        "faithfulness": 0.9,
+        "context_recall": 0.9,
+        "context_precision": 0.85
+      },
+      "composite_threshold": 0.88
+    },
+    "ci_quick": {
+      "description": "Minimal CI gate — single metric, fast execution",
+      "metrics": ["faithfulness"],
+      "weights": {
+        "faithfulness": 1.0
+      },
+      "criteria": {
+        "faithfulness": 0.7
+      },
+      "composite_threshold": 0.7
+    },
+    "full_suite": {
+      "description": "All metrics for thorough offline evaluation",
+      "metrics": [
+        "faithfulness",
+        "answer_relevancy",
+        "context_recall",
+        "context_precision",
+        "noise_sensitivity"
+      ],
+      "weights": {
+        "faithfulness": 0.25,
+        "answer_relevancy": 0.2,
+        "context_recall": 0.2,
+        "context_precision": 0.2,
+        "noise_sensitivity": 0.15
+      },
+      "criteria": {
+        "faithfulness": 0.8,
+        "answer_relevancy": 0.75,
+        "context_recall": 0.7,
+        "context_precision": 0.7,
+        "noise_sensitivity": 0.6
+      }
+    }
+  },
+  "policies": {
+    "medical_dev": {
+      "profile": "medical",
+      "overrides": {
+        "criteria": {
+          "faithfulness": 0.8
+        },
+        "composite_threshold": 0.75
+      }
+    },
+    "legal_staging": {
+      "profile": "legal",
+      "overrides": {
+        "composite_threshold": 0.8
+      }
+    }
+  }
+}

@@ -1,0 +1,102 @@
+# Example: Custom Evaluation Profiles
+#
+# Add your own profiles here and load them with:
+#   ProfileManager(profiles_path="config/profiles_example.yaml")
+#
+# User profiles are merged with the built-in profiles (rag_default, strict,
+# smoke_test). If a user profile has the same name as a built-in, it overrides
+# the built-in.
+#
+# Available metrics (from metric registry):
+#   faithfulness, answer_relevancy, context_recall, context_precision,
+#   context_precision_with_reference, context_entity_recall,
+#   noise_sensitivity, context_relevance
+#
+# Rules:
+#   - weights must sum to 1.0
+#   - every metric listed in 'metrics' must have a weight and a criterion
+#   - composite_threshold is optional; if omitted it is auto-computed as
+#     the weighted sum of per-metric criteria
+
+profiles:
+  # Domain-specific: medical Q&A requires high faithfulness
+  medical:
+    description: "Medical domain — prioritises factual accuracy"
+    metrics:
+      - faithfulness
+      - answer_relevancy
+      - context_recall
+    weights:
+      faithfulness: 0.6
+      answer_relevancy: 0.2
+      context_recall: 0.2
+    criteria:
+      faithfulness: 0.95
+      answer_relevancy: 0.8
+      context_recall: 0.8
+    composite_threshold: 0.9
+
+  # Domain-specific: legal contract review
+  legal:
+    description: "Legal domain — strict on recall and precision"
+    metrics:
+      - faithfulness
+      - context_recall
+      - context_precision
+    weights:
+      faithfulness: 0.4
+      context_recall: 0.35
+      context_precision: 0.25
+    criteria:
+      faithfulness: 0.9
+      context_recall: 0.9
+      context_precision: 0.85
+    composite_threshold: 0.88
+
+  # CI pipeline: fast check with only faithfulness
+  ci_quick:
+    description: "Minimal CI gate — single metric, fast execution"
+    metrics:
+      - faithfulness
+    weights:
+      faithfulness: 1.0
+    criteria:
+      faithfulness: 0.7
+    composite_threshold: 0.7
+
+  # Comprehensive: every available metric
+  full_suite:
+    description: "All metrics for thorough offline evaluation"
+    metrics:
+      - faithfulness
+      - answer_relevancy
+      - context_recall
+      - context_precision
+      - noise_sensitivity
+    weights:
+      faithfulness: 0.25
+      answer_relevancy: 0.2
+      context_recall: 0.2
+      context_precision: 0.2
+      noise_sensitivity: 0.15
+    criteria:
+      faithfulness: 0.8
+      answer_relevancy: 0.75
+      context_recall: 0.7
+      context_precision: 0.7
+      noise_sensitivity: 0.6
+
+# Policies: runtime overrides on top of existing profiles
+# Use case: same profile, different thresholds per environment
+policies:
+  medical_dev:
+    profile: medical
+    overrides:
+      criteria:
+        faithfulness: 0.8
+      composite_threshold: 0.75
+
+  legal_staging:
+    profile: legal
+    overrides:
+      composite_threshold: 0.8

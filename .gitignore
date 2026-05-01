@@ -191,6 +191,7 @@ logs/
 # Data files
 *.csv
 *.json
+!config/*_example.json
 *.xml
 data/
 datasets/

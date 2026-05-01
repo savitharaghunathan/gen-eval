@@ -1,5 +1,6 @@
 import copy
 import datetime
+import json
 import logging
 from pathlib import Path
 
@@ -39,7 +40,10 @@ class ProfileManager:
 
     def _load_user_profiles(self, path: Path):
         with open(path) as f:
-            data = yaml.safe_load(f)
+            if path.suffix == ".json":
+                data = json.load(f)
+            else:
+                data = yaml.safe_load(f)
         if not data:
             return
         if "profiles" in data:
@@ -158,6 +162,10 @@ class ProfileManager:
         scores = {}
         for metric_name in profile["metrics"]:
             candidates = resolve_metric_candidates(metric_name)
+            # Filter to adapters that actually support this metric at runtime
+            adapters = getattr(framework, "adapters", None)
+            if isinstance(adapters, dict):
+                candidates = [(name, cls) for name, cls in candidates if name in adapters and metric_name in adapters[name].supported_metrics]
             resolved = False
             for adapter_name, adapter_metric_class in candidates:
                 try:
