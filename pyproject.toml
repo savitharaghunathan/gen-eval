@@ -7,10 +7,10 @@ requires-python = ">=3.12"
 dependencies = [
     "click>=8.0.0",
     "datasets>=4.0.0",
-    "deepeval>=3.3.2",
+    "deepeval>=3.9.9",
     "pandas>=2.3.1",
     "pydantic>=2.11.7",
-    "ragas>=0.3.0",
+    "ragas>=0.4.3",
     "langchain>=0.1.0",
     "langchain-openai>=0.1.0",
     "langchain-anthropic>=0.1.0",
