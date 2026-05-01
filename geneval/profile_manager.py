@@ -1,5 +1,6 @@
 import copy
 import datetime
+import json
 import logging
 from pathlib import Path
 
@@ -39,7 +40,10 @@ class ProfileManager:
 
     def _load_user_profiles(self, path: Path):
         with open(path) as f:
-            data = yaml.safe_load(f)
+            if path.suffix == ".json":
+                data = json.load(f)
+            else:
+                data = yaml.safe_load(f)
         if not data:
             return
         if "profiles" in data:
