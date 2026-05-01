@@ -142,10 +142,8 @@ class RAGASAdapter:
             return self._create_vllm_client()
         elif provider_name == "deepseek":
             return self._create_deepseek_client()
-        elif provider_name == "amazon_bedrock":
-            return self._create_amazon_bedrock_client()
         else:
-            self.logger.warning(f"Unknown provider: {provider_name}")
+            self.logger.warning(f"Unsupported RAGAS provider: {provider_name}")
             return None
 
     def _create_openai_client(self) -> tuple | None:
@@ -273,21 +271,6 @@ class RAGASAdapter:
             return None
         client = AsyncOpenAI(base_url="https://api.deepseek.com/v1", api_key=api_key)
         return client, "openai"
-
-    def _create_amazon_bedrock_client(self) -> tuple | None:
-        provider_config = self.llm_manager.get_provider_config("amazon_bedrock")
-        aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
-        aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-        if not aws_access_key_id or not aws_secret_access_key:
-            self.logger.warning("AWS credentials not found in environment variables")
-            return None
-        model = provider_config.get("model")
-        if not model:
-            self.logger.error("Amazon Bedrock model not specified in configuration")
-            return None
-        region_name = provider_config.get("region_name", "us-east-1")
-        self.logger.info(f"Amazon Bedrock provider configured: {model}, region: {region_name}")
-        return None
 
     def _create_ragas_embeddings(self):
         try:
