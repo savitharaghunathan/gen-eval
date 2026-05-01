@@ -79,10 +79,11 @@ policies:
 
 **Validation rules:**
 
-- Weights must sum to 1.0
+- Weights must sum to 1.0 (with floating-point tolerance of 1e-6)
 - Every metric in `metrics` must have a corresponding weight and criteria entry
 - Metric names must exist in the adapter capability registry
 - `composite_threshold` defaults to the weighted average of individual criteria if omitted
+- All scores are assumed to be in the 0.0-1.0 range (both RAGAS and DeepEval return normalized scores)
 
 ### Adapter Capability Registry & Auto-Routing
 
@@ -105,6 +106,9 @@ METRIC_REGISTRY = {
     "context_precision": [
         {"adapter": "ragas", "metric_class": "context_precision_without_reference", "priority": 1},
         {"adapter": "deepeval", "metric_class": "context_precision", "priority": 2},
+    ],
+    "context_precision_with_reference": [
+        {"adapter": "ragas", "metric_class": "context_precision_with_reference", "priority": 1},
     ],
     "context_entity_recall": [
         {"adapter": "ragas", "metric_class": "context_entity_recall", "priority": 1},
@@ -279,6 +283,39 @@ print(result.model_dump_json())     # full JSON output
 
 The existing `evaluate()` method remains unchanged for backwards compatibility.
 
+### Batch Evaluation (Multiple Test Cases)
+
+When the CLI receives a `--data` file with multiple test cases, evaluation runs per-case and aggregates:
+
+1. Each test case produces its own `ProfileResult` (per-case scores, per-case pass/fail)
+2. A `BatchResult` aggregates across all cases:
+
+```python
+class BatchResult(BaseModel):
+    profile_name: str
+    policy_name: Optional[str]
+    overall_passed: bool          # True only if ALL cases passed
+    case_results: list[ProfileResult]
+    summary: dict                 # per-metric averages across cases
+    pass_rate: float              # fraction of cases that passed (0.0 - 1.0)
+    metadata: dict
+```
+
+The CLI exit code is based on `BatchResult.overall_passed`. The `--format table` output shows a summary row with averages and a per-case breakdown. For single test cases, the output is still a `ProfileResult` (no wrapping in `BatchResult`).
+
+The programmatic API supports both single and batch evaluation:
+
+```python
+# Single case
+result = framework.evaluate_profile(profile="rigorous_rag", question=..., ...)
+
+# Batch (from data file)
+batch_result = framework.evaluate_profile_batch(
+    profile="rigorous_rag",
+    data_path="test_data.yaml",
+)
+```
+
 ## New Files
 
 | File | Purpose |
@@ -298,8 +335,8 @@ The existing `evaluate()` method remains unchanged for backwards compatibility.
 | File | Change |
 |------|--------|
 | `geneval/framework.py` | Add `evaluate_profile()` method that delegates to ProfileManager |
-| `geneval/schemas.py` | Add `MetricEvaluation` and `ProfileResult` Pydantic models |
-| `geneval/__init__.py` | Export new public classes (ProfileManager, ProfileResult, MetricEvaluation) |
+| `geneval/schemas.py` | Add `MetricEvaluation`, `ProfileResult`, and `BatchResult` Pydantic models |
+| `geneval/__init__.py` | Export new public classes (ProfileManager, ProfileResult, MetricEvaluation, BatchResult) |
 | `pyproject.toml` | Add `click` dependency, register `geneval` console script entry point |
 
 ## Error Handling
